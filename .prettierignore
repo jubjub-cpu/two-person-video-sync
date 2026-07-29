@@ -1,0 +1,8 @@
+node_modules
+dist
+.output
+.wxt
+coverage
+artifacts
+test-results
+pnpm-lock.yaml

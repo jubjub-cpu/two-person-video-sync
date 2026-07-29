@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CC0 Flower Sync Fixture</title>
+    <link rel="stylesheet" href="/fixture.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Deterministic HTML5 video fixture</h1>
+      <p>The media below is the MDN CC0 flower sample. Both test profiles stream their own copy.</p>
+      <section class="stage">
+        <video id="main-video" controls muted preload="auto" aria-label="Main flower video">
+          <source src="/flower-cc0.mp4" type="video/mp4" />
+        </video>
+        <div class="controls">
+          <button id="simulate-buffer" type="button">Simulate buffering</button>
+        </div>
+        <output>Ready</output>
+      </section>
+    </main>
+    <script type="module" src="/fixture.js"></script>
+  </body>
+</html>

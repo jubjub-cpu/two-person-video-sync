@@ -1,0 +1,32 @@
+{
+  "name": "@watch-sync/extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "dev:firefox": "wxt -b firefox --mv3",
+    "prepare": "wxt prepare",
+    "build": "pnpm build:chrome && pnpm build:firefox",
+    "build:chrome": "wxt build -b chrome --mv3",
+    "build:firefox": "wxt build -b firefox --mv3",
+    "package:chrome": "wxt zip -b chrome --mv3",
+    "package:firefox": "wxt zip -b firefox --mv3",
+    "package:all": "pnpm package:chrome && pnpm package:firefox",
+    "typecheck": "wxt prepare && tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@watch-sync/protocol": "workspace:*",
+    "@watch-sync/sync-core": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@tabler/icons": "3.45.0",
+    "@types/chrome": "^0.1.4",
+    "happy-dom": "^20.0.10",
+    "vite": "^7.0.6",
+    "wxt": "^0.21.2"
+  }
+}

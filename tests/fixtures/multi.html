@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Multiple Video Sync Fixture</title>
+    <link rel="stylesheet" href="/fixture.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Multiple-player fixture</h1>
+      <section class="stage">
+        <video
+          id="main-video"
+          controls
+          muted
+          preload="auto"
+          aria-label="Main full-size flower video"
+        >
+          <source src="/flower-cc0.mp4" type="video/mp4" />
+        </video>
+        <video class="preview" muted loop preload="metadata" aria-label="Tiny looping preview">
+          <source src="/flower-cc0.mp4" type="video/mp4" />
+        </video>
+        <output>Ready</output>
+      </section>
+    </main>
+    <script type="module" src="/fixture.js"></script>
+  </body>
+</html>

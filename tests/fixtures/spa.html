@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SPA Video Replacement Fixture</title>
+    <link rel="stylesheet" href="/fixture.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Single-page player replacement fixture</h1>
+      <section class="stage">
+        <video id="main-video" controls muted preload="auto" aria-label="Replaceable flower video">
+          <source src="/flower-cc0.mp4" type="video/mp4" />
+        </video>
+        <div class="controls">
+          <button id="replace-video" type="button">Replace video element</button>
+        </div>
+        <output>Ready</output>
+      </section>
+    </main>
+    <script type="module" src="/fixture.js"></script>
+  </body>
+</html>

@@ -1,0 +1,16 @@
+packages:
+  - apps/*
+  - packages/*
+  - tests/*
+
+allowBuilds:
+  esbuild: true
+  sharp: true
+  unrs-resolver: true
+
+minimumReleaseAgeExclude:
+  - wxt@0.21.2
+
+onlyBuiltDependencies:
+  - esbuild
+  - sharp

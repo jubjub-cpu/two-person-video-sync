@@ -1,0 +1,78 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, sans-serif;
+  background: #0c1222;
+  color: #f4f6fb;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+main {
+  margin: 0 auto;
+  max-width: 980px;
+  padding: 32px;
+}
+
+h1 {
+  font-size: 25px;
+  margin: 0 0 8px;
+}
+
+p {
+  color: #aeb8cd;
+}
+
+.stage {
+  background: #131d34;
+  border: 1px solid #2b3959;
+  border-radius: 18px;
+  box-shadow: 0 18px 60px #0005;
+  margin-top: 24px;
+  padding: 18px;
+}
+
+video {
+  background: #050914;
+  border-radius: 12px;
+  display: block;
+  max-width: 100%;
+}
+
+#main-video {
+  aspect-ratio: 16 / 9;
+  width: 100%;
+}
+
+.preview {
+  height: 90px;
+  margin-top: 18px;
+  width: 160px;
+}
+
+.controls {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+button {
+  background: #2e77ff;
+  border: 0;
+  border-radius: 9px;
+  color: white;
+  cursor: pointer;
+  font: 700 13px system-ui;
+  padding: 10px 13px;
+}
+
+output {
+  color: #70e1d1;
+  display: block;
+  font:
+    12px ui-monospace,
+    monospace;
+  margin-top: 12px;
+}

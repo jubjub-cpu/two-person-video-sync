@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Two Person Video Sync</title>
+  </head>
+  <body>
+    <main class="popup-shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">
+            <span class="ui-icon icon-play"></span>
+          </span>
+          <h1>Video Sync</h1>
+        </div>
+      </header>
+
+      <section id="status-card" class="status-card" aria-live="polite">
+        <span id="status-dot" class="status-dot"></span>
+        <div class="status-copy">
+          <strong id="status-title">Checking this page…</strong>
+          <p id="status-message">Looking for a controllable video.</p>
+        </div>
+      </section>
+
+      <section id="permission-panel" class="panel permission-panel" hidden>
+        <span class="eyebrow">Site access</span>
+        <h2>Enable on this site</h2>
+        <p>The extension needs access only to detect and control the video on this site.</p>
+        <button id="enable-site" class="primary full" type="button">Enable on this site</button>
+      </section>
+
+      <section id="video-panel" class="video-card" hidden>
+        <span class="eyebrow">Detected video</span>
+        <div class="video-summary">
+          <span class="media-mark" aria-hidden="true">
+            <span class="ui-icon icon-play"></span>
+          </span>
+          <div class="video-copy">
+            <strong id="video-title">Video</strong>
+            <span id="video-detail">Ready to synchronize</span>
+          </div>
+          <button id="picker-toggle" class="text-button" type="button" hidden>Choose video</button>
+        </div>
+      </section>
+
+      <section id="picker-panel" class="panel picker-panel" hidden>
+        <span class="eyebrow">Video selection</span>
+        <h2>Choose the main video</h2>
+        <div id="video-picker" class="picker"></div>
+      </section>
+
+      <section id="lobby-panel" class="panel lobby-panel" hidden>
+        <fieldset class="mode-fieldset">
+          <legend>Sync mode</legend>
+          <p class="section-help">Choose whose playback state syncs.</p>
+          <div class="mode-grid">
+            <label class="radio-row">
+              <span class="mode-icon" aria-hidden="true">
+                <span class="ui-icon icon-user"></span>
+              </span>
+              <span class="mode-copy">
+                <strong>Host only</strong>
+                <small>Only you control playback</small>
+              </span>
+              <input type="radio" name="control-mode" value="host-only" checked />
+            </label>
+            <label class="radio-row">
+              <span class="mode-icon" aria-hidden="true">
+                <span class="ui-icon icon-users"></span>
+              </span>
+              <span class="mode-copy">
+                <strong>Either person</strong>
+                <small>Anyone can control</small>
+              </span>
+              <input type="radio" name="control-mode" value="shared" />
+            </label>
+          </div>
+        </fieldset>
+
+        <div class="create-section">
+          <span class="eyebrow">Create a room</span>
+          <p class="section-help">Create a private room and invite a friend.</p>
+          <button id="create-room" class="primary full create-button" type="button">
+            <span class="button-icon-frame" aria-hidden="true">
+              <span class="ui-icon icon-plus"></span>
+            </span>
+            <span>Create private room</span>
+          </button>
+        </div>
+
+        <div class="divider"><span>or join</span></div>
+
+        <form id="join-form">
+          <label for="room-code">Join a room</label>
+          <p class="section-help">Enter a room code to join.</p>
+          <div class="input-row">
+            <span class="input-prefix" aria-hidden="true">
+              <span class="ui-icon icon-hash"></span>
+            </span>
+            <input
+              id="room-code"
+              name="room-code"
+              inputmode="text"
+              autocomplete="off"
+              maxlength="96"
+              placeholder="Enter room code"
+              required
+            />
+            <button class="secondary" type="submit">Join</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="room-panel" class="panel room-panel" hidden>
+        <div class="room-heading">
+          <div>
+            <span class="eyebrow">Private room</span>
+            <strong id="room-role">Host</strong>
+          </div>
+          <span id="participant-count" class="participant-pill">1 of 2</span>
+        </div>
+        <div id="room-code-wrap">
+          <label for="room-code-display">Share this code</label>
+          <div class="code-row">
+            <code id="room-code-display">—</code>
+            <button id="copy-code" class="secondary" type="button">Copy</button>
+          </div>
+        </div>
+        <button id="ready-button" class="primary full" type="button" hidden>
+          Click once to enable synchronized playback
+        </button>
+        <button id="open-peer-video" class="primary full" type="button" hidden>
+          Open the same video
+        </button>
+        <label class="switch-row" id="room-mode-row">
+          <span>
+            <strong>Shared controls</strong>
+            <small>Either person may play, pause, or seek</small>
+          </span>
+          <input id="room-mode" type="checkbox" role="switch" />
+        </label>
+        <div class="button-row">
+          <button id="leave-room" class="secondary" type="button">Leave room</button>
+          <button id="end-room" class="danger" type="button" hidden>End room</button>
+        </div>
+      </section>
+
+      <p id="error-message" class="error" role="alert" hidden></p>
+
+      <button
+        id="open-options"
+        class="settings-row"
+        type="button"
+        title="Open settings"
+        aria-label="Open settings"
+      >
+        <span class="settings-label">
+          <span class="ui-icon icon-settings" aria-hidden="true"></span>
+          <span>Settings</span>
+        </span>
+        <span class="ui-icon icon-chevron" aria-hidden="true"></span>
+      </button>
+
+      <footer>
+        <span>Playback state only</span>
+        <span id="server-label" class="visually-hidden">Local sync service</span>
+        <a id="privacy-link" href="#" title="Privacy information" aria-label="Privacy information">
+          <span class="ui-icon icon-info" aria-hidden="true"></span>
+        </a>
+      </footer>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

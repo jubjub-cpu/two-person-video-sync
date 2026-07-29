@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="manifest.open_in_tab" content="true" />
+    <title>Video Sync Settings</title>
+  </head>
+  <body>
+    <main>
+      <header class="page-header">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">
+            <img src="/icons/ui/player-play.svg" width="24" height="24" alt="" />
+          </span>
+          <span>Video Sync</span>
+        </div>
+        <div class="header-copy">
+          <p class="eyebrow">Video Sync</p>
+          <h1>Settings</h1>
+          <p>Manage appearance, connection, playback, and site access.</p>
+        </div>
+      </header>
+
+      <form id="settings-form">
+        <section aria-labelledby="appearance-heading">
+          <div class="section-heading">
+            <div>
+              <h2 id="appearance-heading">Appearance</h2>
+              <p>Choose how Video Sync looks. System follows your device setting.</p>
+            </div>
+          </div>
+          <fieldset class="theme-picker" aria-describedby="appearance-help">
+            <legend>Color theme</legend>
+            <div class="segmented-control">
+              <label class="theme-option">
+                <input id="theme-system" type="radio" name="theme-mode" value="system" checked />
+                <span>
+                  <strong>System</strong>
+                  <small>Match this device</small>
+                </span>
+              </label>
+              <label class="theme-option">
+                <input id="theme-light" type="radio" name="theme-mode" value="light" />
+                <span>
+                  <strong>Light</strong>
+                  <small>Always use light</small>
+                </span>
+              </label>
+              <label class="theme-option">
+                <input id="theme-dark" type="radio" name="theme-mode" value="dark" />
+                <span>
+                  <strong>Dark</strong>
+                  <small>Always use dark</small>
+                </span>
+              </label>
+            </div>
+            <p id="appearance-help" class="hint">Your choice applies to the popup and settings.</p>
+          </fieldset>
+        </section>
+
+        <section aria-labelledby="service-heading">
+          <div class="section-heading">
+            <div>
+              <h2 id="service-heading">Synchronization service</h2>
+              <p>Set the secure service that connects both viewers.</p>
+            </div>
+          </div>
+          <div class="section-content">
+            <label for="server-url">WebSocket server URL</label>
+            <input id="server-url" type="url" spellcheck="false" required />
+            <p class="hint">
+              Use <code>wss://</code> outside your own computer. Local development may use
+              <code>ws://127.0.0.1</code> or <code>ws://localhost</code>.
+            </p>
+          </div>
+        </section>
+
+        <section aria-labelledby="playback-heading">
+          <div class="section-heading">
+            <div>
+              <h2 id="playback-heading">Playback defaults</h2>
+              <p>Set who controls a new room and whether status appears over video.</p>
+            </div>
+          </div>
+          <div class="section-content">
+            <label for="default-mode">Default control mode</label>
+            <select id="default-mode">
+              <option value="host-only">Host controls playback</option>
+              <option value="shared">Either person controls playback</option>
+            </select>
+            <label class="check-row">
+              <input id="show-badge" type="checkbox" />
+              <span
+                ><strong>Show the in-page status badge</strong
+                ><small>Displays connection and sync state over the page.</small></span
+              >
+            </label>
+          </div>
+        </section>
+
+        <section aria-labelledby="permissions-heading">
+          <div class="section-heading">
+            <div>
+              <h2 id="permissions-heading">Site permissions</h2>
+              <p>Control where the extension can detect and synchronize video.</p>
+            </div>
+          </div>
+          <div class="section-content">
+            <p>
+              The extension normally asks only for the site you enable. You can optionally grant all
+              website access for a more seamless experience.
+            </p>
+            <div class="button-row">
+              <button id="grant-all" class="secondary" type="button">
+                Grant all website access
+              </button>
+              <button id="remove-all" class="secondary" type="button">
+                Remove all website access
+              </button>
+            </div>
+            <div id="permission-summary" class="summary" aria-live="polite"></div>
+          </div>
+        </section>
+
+        <section aria-labelledby="diagnostics-heading">
+          <div class="section-heading">
+            <div>
+              <h2 id="diagnostics-heading">Privacy-safe diagnostics</h2>
+              <p>Export troubleshooting details without exposing private viewing data.</p>
+            </div>
+          </div>
+          <div class="section-content">
+            <p>
+              Diagnostics contain recent state transitions, latency, drift, adapter choice, and
+              errors. Room codes, secrets, full URLs, titles, page contents, and account data are
+              removed.
+            </p>
+            <div class="button-row">
+              <button id="export-diagnostics" class="secondary" type="button">
+                Export diagnostics
+              </button>
+              <button id="clear-diagnostics" class="secondary" type="button">
+                Clear diagnostics
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section class="privacy" aria-labelledby="privacy-heading">
+          <div class="section-heading">
+            <div>
+              <h2 id="privacy-heading">What this extension shares</h2>
+              <p>A narrow set of playback details—and nothing from the video itself.</p>
+            </div>
+          </div>
+          <div class="section-content">
+            <p>
+              Only video identity, timing, play/pause, rate, and buffering state are sent to your
+              configured server. It never captures or sends audio, video, cookies, passwords, or
+              viewing-account details.
+            </p>
+            <p>
+              Both viewers need their own legitimate access to the same video. Volume, captions,
+              language, quality, and fullscreen remain personal.
+            </p>
+          </div>
+        </section>
+
+        <div class="save-row">
+          <button class="primary" type="submit">Save settings</button>
+          <span id="save-status" role="status" aria-live="polite"></span>
+        </div>
+      </form>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
