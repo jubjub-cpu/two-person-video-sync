@@ -1,4 +1,6 @@
-import { getSettings } from "../lib/settings";
+import { browser } from "wxt/browser";
+
+import { getSettings, SETTINGS_KEY } from "../lib/settings";
 import { MediaSessionController } from "../lib/sync/media-controller";
 
 const INSTANCE_KEY = "__twoPersonVideoSyncController";
@@ -17,9 +19,25 @@ export default defineContentScript({
   async main() {
     if (window[INSTANCE_KEY]) return;
     const settings = await getSettings();
-    const controller = new MediaSessionController(settings.showBadge, () => {
-      delete window[INSTANCE_KEY];
+    const controller = new MediaSessionController({
+      showBadge: settings.showBadge,
+      themeMode: settings.themeMode,
+      closeIconUrl: browser.runtime.getURL("/icons/ui/x.svg"),
+      onDestroy: () => {
+        browser.storage.onChanged.removeListener(handleSettingsChange);
+        delete window[INSTANCE_KEY];
+      },
     });
+    const handleSettingsChange: Parameters<typeof browser.storage.onChanged.addListener>[0] = (
+      changes,
+      areaName,
+    ) => {
+      if (areaName !== "local" || !(SETTINGS_KEY in changes)) return;
+      void getSettings().then((next) => {
+        controller.setBadgeAppearance(next.showBadge, next.themeMode);
+      });
+    };
+    browser.storage.onChanged.addListener(handleSettingsChange);
     window[INSTANCE_KEY] = controller;
     controller.start();
   },

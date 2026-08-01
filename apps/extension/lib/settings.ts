@@ -13,7 +13,7 @@ const DEVELOPMENT_SYNC_SERVER_URL = "ws://127.0.0.1:8787/ws";
 const BUNDLED_SYNC_SERVER_URL =
   import.meta.env.WXT_SYNC_SERVER_URL?.trim() || DEVELOPMENT_SYNC_SERVER_URL;
 
-const SETTINGS_KEY = "settings";
+export const SETTINGS_KEY = "settings";
 
 export async function getSettings(): Promise<ExtensionSettings> {
   const stored = await browser.storage.local.get(SETTINGS_KEY);

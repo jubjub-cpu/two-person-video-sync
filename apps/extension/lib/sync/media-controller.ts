@@ -13,6 +13,7 @@ import type {
   RuntimeRequest,
   RuntimeResponse,
   SyncStatus,
+  ThemeMode,
   VideoSnapshot,
 } from "../types";
 
@@ -28,6 +29,13 @@ interface Suppression {
   until: number;
   expectedPosition?: number;
   expectedRate?: number;
+}
+
+interface MediaSessionControllerOptions {
+  showBadge: boolean;
+  themeMode: ThemeMode;
+  closeIconUrl: string;
+  onDestroy?: () => void;
 }
 
 function response<T>(promise: Promise<T>, sendResponse: (value: RuntimeResponse<T>) => void): void {
@@ -57,6 +65,8 @@ export class MediaSessionController {
   private localCanControl = false;
   private barrierHolding = false;
   private initialSyncPending = false;
+  private badgeStatus: SyncStatus = "ready";
+  private badgeDetail?: string;
   private runtimeListener?: Parameters<typeof browser.runtime.onMessage.addListener>[0];
   private readonly boundListeners: Array<[keyof HTMLMediaElementEventMap, EventListener]> = [];
   private readonly onLocationChange = (): void => this.handlePlayersChanged();
@@ -67,12 +77,20 @@ export class MediaSessionController {
     if (event.persisted) this.handlePlayersChanged();
   };
 
-  constructor(
-    private readonly showBadge: boolean,
-    private readonly onDestroy?: () => void,
-  ) {
+  constructor(private readonly options: MediaSessionControllerOptions) {
     this.detector = new PlayerDetector(() => this.handlePlayersChanged());
-    if (showBadge) this.badge = new StatusBadge();
+    this.setBadgeAppearance(options.showBadge, options.themeMode);
+  }
+
+  setBadgeAppearance(showBadge: boolean, themeMode: ThemeMode): void {
+    if (!showBadge) {
+      this.badge?.destroy();
+      this.badge = undefined;
+      return;
+    }
+    this.badge ??= new StatusBadge(themeMode, this.options.closeIconUrl);
+    this.badge.setThemeMode(themeMode);
+    this.badge.update(this.badgeStatus, this.badgeDetail);
   }
 
   start(): void {
@@ -109,7 +127,7 @@ export class MediaSessionController {
     window.removeEventListener("wxt:locationchange", this.onLocationChange);
     if (this.snapshotTimer) window.clearInterval(this.snapshotTimer);
     if (this.bufferTimer) window.clearTimeout(this.bufferTimer);
-    this.onDestroy?.();
+    this.options.onDestroy?.();
   }
 
   private handlePlayersChanged(): void {
@@ -521,6 +539,8 @@ export class MediaSessionController {
   }
 
   private updateBadge(status: SyncStatus, message?: string): void {
+    this.badgeStatus = status;
+    this.badgeDetail = message;
     this.badge?.update(status, message);
   }
 
