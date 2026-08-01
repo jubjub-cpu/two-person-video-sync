@@ -1,14 +1,13 @@
 import { browser } from "wxt/browser";
 
 import { clearDiagnostics, exportDiagnostics } from "../../lib/diagnostics";
-import { getSettings, normalizeServerUrl, saveSettings } from "../../lib/settings";
+import { getSettings, saveSettings } from "../../lib/settings";
 import { applyThemeMode } from "../../lib/theme";
 import type { ThemeMode } from "../../lib/types";
 
 import "./style.css";
 
 const form = required<HTMLFormElement>("settings-form");
-const serverUrl = required<HTMLInputElement>("server-url");
 const defaultMode = required<HTMLSelectElement>("default-mode");
 const showBadge = required<HTMLInputElement>("show-badge");
 const themeSystem = required<HTMLInputElement>("theme-system");
@@ -50,17 +49,7 @@ async function refreshPermissions(): Promise<void> {
 form.addEventListener("submit", (event) => {
   event.preventDefault();
   void (async () => {
-    const value = normalizeServerUrl(serverUrl.value);
-    if (!value) {
-      serverUrl.setCustomValidity(
-        "Use wss://, or ws://localhost / ws://127.0.0.1 for local development.",
-      );
-      serverUrl.reportValidity();
-      return;
-    }
-    serverUrl.setCustomValidity("");
     await saveSettings({
-      serverUrl: value,
       defaultControlMode: defaultMode.value === "shared" ? "shared" : "host-only",
       themeMode: selectedThemeMode(),
       showBadge: showBadge.checked,
@@ -123,7 +112,6 @@ required<HTMLButtonElement>("clear-diagnostics").addEventListener("click", () =>
 
 async function initialize(): Promise<void> {
   const settings = await getSettings();
-  serverUrl.value = settings.serverUrl;
   defaultMode.value = settings.defaultControlMode;
   showBadge.checked = settings.showBadge;
   setThemeSelection(settings.themeMode);

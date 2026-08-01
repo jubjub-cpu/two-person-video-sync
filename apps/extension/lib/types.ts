@@ -17,7 +17,6 @@ export type SyncStatus =
   | "ended";
 
 export interface ExtensionSettings {
-  serverUrl: string;
   defaultControlMode: ControlMode;
   themeMode: ThemeMode;
   showBadge: boolean;
@@ -88,7 +87,6 @@ export interface PopupState {
   video?: VideoSnapshot;
   candidates: VideoCandidateSummary[];
   room: RoomView;
-  serverUrl: string;
 }
 
 export type LocalMediaAction =

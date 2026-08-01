@@ -3,12 +3,15 @@ import { browser } from "wxt/browser";
 import type { ExtensionSettings, ThemeMode } from "./types";
 
 export const DEFAULT_SETTINGS: ExtensionSettings = {
-  serverUrl: "ws://127.0.0.1:8787/ws",
   defaultControlMode: "host-only",
   themeMode: "system",
   showBadge: true,
   enabledOrigins: [],
 };
+
+const DEVELOPMENT_SYNC_SERVER_URL = "ws://127.0.0.1:8787/ws";
+const BUNDLED_SYNC_SERVER_URL =
+  import.meta.env.WXT_SYNC_SERVER_URL?.trim() || DEVELOPMENT_SYNC_SERVER_URL;
 
 const SETTINGS_KEY = "settings";
 
@@ -16,9 +19,9 @@ export async function getSettings(): Promise<ExtensionSettings> {
   const stored = await browser.storage.local.get(SETTINGS_KEY);
   const partial = stored[SETTINGS_KEY] as Partial<ExtensionSettings> | undefined;
   return {
-    ...DEFAULT_SETTINGS,
-    ...partial,
+    defaultControlMode: partial?.defaultControlMode === "shared" ? "shared" : "host-only",
     themeMode: normalizeThemeMode(partial?.themeMode),
+    showBadge: typeof partial?.showBadge === "boolean" ? partial.showBadge : true,
     enabledOrigins: Array.isArray(partial?.enabledOrigins) ? partial.enabledOrigins : [],
   };
 }
@@ -67,6 +70,16 @@ export function normalizeServerUrl(value: string): string | null {
     return null;
   }
 }
+
+export function resolveSyncServerUrl(value: string = BUNDLED_SYNC_SERVER_URL): string {
+  const normalized = normalizeServerUrl(value);
+  if (!normalized) {
+    throw new Error("The bundled synchronization service address is invalid.");
+  }
+  return normalized;
+}
+
+export const SYNC_SERVER_URL = resolveSyncServerUrl();
 
 export function originPatternForUrl(value: string): string | null {
   try {

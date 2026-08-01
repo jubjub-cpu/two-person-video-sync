@@ -50,7 +50,6 @@ const elements = {
   error: required<HTMLElement>("error-message"),
   openOptions: required<HTMLButtonElement>("open-options"),
   privacyLink: required<HTMLAnchorElement>("privacy-link"),
-  serverLabel: required<HTMLElement>("server-label"),
 };
 
 let activeTabId: number | undefined;
@@ -187,9 +186,6 @@ function render(next: PopupState): void {
     });
     elements.picker.append(button);
   });
-  elements.serverLabel.textContent = next.serverUrl.startsWith("ws://127.0.0.1")
-    ? "Local sync service"
-    : "Custom sync service";
   renderRoom(next.room);
 }
 
@@ -216,7 +212,6 @@ async function refresh(): Promise<void> {
           ? "Enable access to detect the video on this site."
           : "Browser pages, PDFs, and extension stores cannot be controlled.",
       },
-      serverUrl: settings.serverUrl,
     });
     if (!supportedPage) showError(error);
   }
@@ -246,6 +241,8 @@ elements.createRoom.addEventListener(
         controlMode: selectedMode(),
       });
       await refresh();
+      const code = state?.room.roomCode;
+      if (code) await navigator.clipboard.writeText(code);
     }),
 );
 elements.joinForm.addEventListener("submit", (event) => {

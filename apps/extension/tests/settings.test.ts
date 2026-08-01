@@ -5,6 +5,7 @@ import {
   normalizeServerUrl,
   normalizeThemeMode,
   originPatternForUrl,
+  resolveSyncServerUrl,
 } from "../lib/settings";
 
 describe("settings safety", () => {
@@ -32,6 +33,13 @@ describe("settings safety", () => {
     expect(normalizeServerUrl("wss://user:pass@sync.example.test/ws")).toBeNull();
     expect(normalizeServerUrl("wss://sync.example.test/ws?token=secret")).toBeNull();
     expect(normalizeServerUrl("wss://sync.example.test/ws#secret")).toBeNull();
+  });
+
+  it("resolves a bundled relay without accepting unsafe transport", () => {
+    expect(resolveSyncServerUrl("wss://sync.example.test")).toBe("wss://sync.example.test/ws");
+    expect(() => resolveSyncServerUrl("ws://sync.example.test/ws")).toThrow(
+      "bundled synchronization service address is invalid",
+    );
   });
 
   it("normalizes persisted appearance values", () => {

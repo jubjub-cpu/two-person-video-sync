@@ -19,7 +19,7 @@
         <div class="header-copy">
           <p class="eyebrow">Video Sync</p>
           <h1>Settings</h1>
-          <p>Manage appearance, connection, playback, and site access.</p>
+          <p>Manage appearance, playback, and site access.</p>
         </div>
       </header>
 
@@ -58,23 +58,6 @@
             </div>
             <p id="appearance-help" class="hint">Your choice applies to the popup and settings.</p>
           </fieldset>
-        </section>
-
-        <section aria-labelledby="service-heading">
-          <div class="section-heading">
-            <div>
-              <h2 id="service-heading">Synchronization service</h2>
-              <p>Set the secure service that connects both viewers.</p>
-            </div>
-          </div>
-          <div class="section-content">
-            <label for="server-url">WebSocket server URL</label>
-            <input id="server-url" type="url" spellcheck="false" required />
-            <p class="hint">
-              Use <code>wss://</code> outside your own computer. Local development may use
-              <code>ws://127.0.0.1</code> or <code>ws://localhost</code>.
-            </p>
-          </div>
         </section>
 
         <section aria-labelledby="playback-heading">
@@ -157,9 +140,9 @@
           </div>
           <div class="section-content">
             <p>
-              Only video identity, timing, play/pause, rate, and buffering state are sent to your
-              configured server. It never captures or sends audio, video, cookies, passwords, or
-              viewing-account details.
+              Only video identity, timing, play/pause, rate, and buffering state are sent to the
+              synchronization service. It never captures or sends audio, video, cookies, passwords,
+              or viewing-account details.
             </p>
             <p>
               Both viewers need their own legitimate access to the same video. Volume, captions,
