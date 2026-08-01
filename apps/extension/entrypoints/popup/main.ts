@@ -242,7 +242,9 @@ elements.createRoom.addEventListener(
       });
       await refresh();
       const code = state?.room.roomCode;
-      if (code) await navigator.clipboard.writeText(code);
+      if (code) {
+        await navigator.clipboard.writeText(code).catch(() => undefined);
+      }
     }),
 );
 elements.joinForm.addEventListener("submit", (event) => {

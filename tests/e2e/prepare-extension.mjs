@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const extensionRoot = resolve(here, "../../apps/extension");
-const source = join(extensionRoot, ".output/chrome-mv3");
+const source = join(extensionRoot, ".output/chrome-mv3-testing");
 const outputRoot = join(extensionRoot, ".output") + sep;
 const target = join(extensionRoot, ".output/chrome-mv3-e2e");
 

@@ -2,10 +2,8 @@
 
 ## Supported release
 
-The current development release is `0.1.x`. It is intended for local evaluation and for
-self-hosted synchronization services configured by the user. The prepared browser packages
-have not been published to an extension store and no public relay is operated by this
-repository.
+The current release is `0.2.x`. Release builds use the hosted synchronization relay. The
+prepared browser packages have not yet been published to an extension store.
 
 ## Reporting a vulnerability
 
@@ -41,8 +39,8 @@ password, cookie, or token.
 A room code is a bearer secret: anyone who obtains it before it expires may attempt to join.
 Share it through a trusted channel. A compromised browser page can observe and interfere with
 its own video element; extension isolated worlds reduce but cannot eliminate a hostile site's
-ability to replace or manipulate the player. A self-hosted relay operator can observe the
-privacy-minimized synchronization metadata described in `PRIVACY.md`.
+ability to replace or manipulate the player. A relay operator can observe the privacy-minimized
+synchronization metadata described in `PRIVACY.md`.
 
 The extension does not bypass DRM, subscriptions, regional controls, advertisements, or
 autoplay policy. It deliberately suspends synchronization when identity, duration, live,
