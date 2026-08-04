@@ -13,9 +13,9 @@ export default defineConfig({
     name: "Two Person Video Sync",
     short_name: "Video Sync",
     description: "Keep playback state synchronized for exactly two viewers. Media is never shared.",
-    version: "0.1.0",
+    version: "0.2.0",
     ...(browser === "chrome" ? { minimum_chrome_version: "116" } : {}),
-    permissions: ["activeTab", "scripting", "storage"],
+    permissions: ["activeTab", "clipboardWrite", "scripting", "storage"],
     optional_host_permissions: OPTIONAL_HOSTS,
     action: {
       default_title: "Two Person Video Sync",

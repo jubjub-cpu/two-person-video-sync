@@ -24,7 +24,7 @@ import { browser } from "wxt/browser";
 import { failure, success } from "../lib/bridge";
 import { recordDiagnostic } from "../lib/diagnostics";
 import { RuntimeRequestSchema } from "../lib/runtime-schema";
-import { getSettings, originPatternForUrl, saveSettings } from "../lib/settings";
+import { getSettings, originPatternForUrl, saveSettings, SYNC_SERVER_URL } from "../lib/settings";
 import type {
   ControlMode,
   LocalMediaAction,
@@ -41,6 +41,9 @@ const CONTENT_SCRIPT_FILE = "/content-scripts/content.js";
 const STORED_SESSIONS_KEY = "activeSessions";
 const SOCKET_HEARTBEAT_MS = 20_000;
 const REQUEST_TIMEOUT_MS = 10_000;
+const SOCKET_ATTEMPT_TIMEOUT_MS = 8_000;
+const INITIAL_CONNECT_WINDOW_MS = 75_000;
+const INITIAL_RETRY_DELAY_MS = 2_000;
 const MAX_RECONNECT_DELAY_MS = 30_000;
 
 type RoomSessionMessage = Extract<
@@ -446,8 +449,45 @@ class RoomClient {
     if (this.socket?.readyState === WebSocket.OPEN) return;
     if (this.connecting) return this.connecting;
     this.intentionalClose = false;
-    this.connecting = new Promise<void>((resolve, reject) => {
+    const connection = this.session ? this.openSocket() : this.connectWithRetry();
+    this.connecting = connection.finally(() => {
+      this.connecting = undefined;
+    });
+    return this.connecting;
+  }
+
+  private async connectWithRetry(): Promise<void> {
+    const deadline = Date.now() + INITIAL_CONNECT_WINDOW_MS;
+    let lastError = new Error("Could not connect to the synchronization service.");
+    while (!this.intentionalClose && Date.now() < deadline) {
+      try {
+        await this.openSocket();
+        return;
+      } catch (error) {
+        lastError = error instanceof Error ? error : lastError;
+        if (this.intentionalClose || Date.now() >= deadline) break;
+        this.updateRoom({
+          status: "reconnecting",
+          message: "Starting the synchronization service. The first connection can take a minute.",
+          reconnecting: true,
+        });
+        await new Promise<void>((resolve) =>
+          globalThis.setTimeout(resolve, INITIAL_RETRY_DELAY_MS),
+        );
+      }
+    }
+    this.updateRoom({
+      status: "offline",
+      message: "Could not reach the synchronization service. Try again in a moment.",
+      reconnecting: false,
+    });
+    throw lastError;
+  }
+
+  private openSocket(): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
       let settled = false;
+      let opened = false;
       let socket: WebSocket;
       try {
         socket = new WebSocket(this.options.serverUrl);
@@ -461,10 +501,11 @@ class RoomClient {
         settled = true;
         socket.close();
         reject(new Error("The synchronization service did not respond."));
-      }, REQUEST_TIMEOUT_MS);
+      }, SOCKET_ATTEMPT_TIMEOUT_MS);
       socket.addEventListener("open", () => {
         if (settled) return;
         settled = true;
+        opened = true;
         globalThis.clearTimeout(timeout);
         this.reconnectAttempt = 0;
         this.startHeartbeat();
@@ -477,15 +518,12 @@ class RoomClient {
           settled = true;
           reject(new Error("Could not connect to the synchronization service."));
         }
-        this.handleDisconnect();
+        if (opened && this.socket === socket) this.handleDisconnect();
       });
       socket.addEventListener("error", () => {
         void recordDiagnostic("background", "socket-error");
       });
-    }).finally(() => {
-      this.connecting = undefined;
     });
-    return this.connecting;
   }
 
   private handleMessage(raw: unknown): void {
@@ -934,11 +972,10 @@ export default defineBackground(() => {
     });
   };
 
-  const makeClient = async (tabId: number, restored?: StoredSession): Promise<RoomClient> => {
-    const settings = await getSettings();
+  const makeClient = (tabId: number, restored?: StoredSession): RoomClient => {
     const client = new RoomClient({
       tabId,
-      serverUrl: settings.serverUrl,
+      serverUrl: SYNC_SERVER_URL,
       restored,
       getSnapshot: () => snapshots.get(tabId),
       onRoom: (room) => broadcastRoom(tabId, room),
@@ -1043,7 +1080,6 @@ export default defineBackground(() => {
       ...(snapshot ? { video: snapshot } : {}),
       candidates: candidates.get(tabId) ?? [],
       room,
-      serverUrl: settings.serverUrl,
     };
   };
 
@@ -1060,12 +1096,12 @@ export default defineBackground(() => {
         await injectCurrent(request.tabId);
         return popupState(request.tabId);
       case "popup/create-room": {
-        const client = clients.get(request.tabId) ?? (await makeClient(request.tabId));
+        const client = clients.get(request.tabId) ?? makeClient(request.tabId);
         await client.create(request.controlMode);
         return client.view();
       }
       case "popup/join-room": {
-        const client = clients.get(request.tabId) ?? (await makeClient(request.tabId));
+        const client = clients.get(request.tabId) ?? makeClient(request.tabId);
         await client.join(request.roomCode);
         return client.view();
       }
@@ -1229,7 +1265,7 @@ export default defineBackground(() => {
       try {
         await browser.tabs.get(tabId);
         persisted.set(tabId, session);
-        const client = await makeClient(tabId, session);
+        const client = makeClient(tabId, session);
         void client.restore().catch(() => undefined);
       } catch {
         persisted.delete(tabId);

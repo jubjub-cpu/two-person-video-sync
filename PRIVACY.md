@@ -1,13 +1,13 @@
 # Privacy Notice
 
-Last updated: July 28, 2026
+Last updated: July 31, 2026
 
 Two Person Video Sync coordinates playback state between exactly two people. It does not
 capture, download, decrypt, proxy, rebroadcast, or share audio or video. Each participant
 loads the video independently through their own legitimate website account, subscription,
 device, region, and network connection.
 
-## Data transmitted to the configured synchronization service
+## Data transmitted to the synchronization service
 
 While a room is active, the extension sends only the minimum metadata needed to compare and
 coordinate the two players:
@@ -21,7 +21,7 @@ coordinate the two players:
 - short-lived reconnection credentials.
 
 Room codes and reconnection credentials are authentication secrets. They are transmitted to
-the configured service over WebSocket, are redacted from application logs, expire, and are
+the service over secure WebSocket, are redacted from application logs, expire, and are
 removed from local storage when the session ends.
 
 The implementation does **not** send page contents, DOM contents, media bytes, cookies,
@@ -38,7 +38,6 @@ for analytics, advertising, profiling, or sale.
 
 The extension uses browser-local extension storage for:
 
-- the configured synchronization service URL;
 - the default control mode and badge preference;
 - site-origin grants selected by the user;
 - an expiring active-room reconnection session; and
@@ -64,6 +63,7 @@ transport security, infrastructure logs, retention, and the public privacy notic
 Required browser permissions are limited to:
 
 - `storage` for settings, active-session recovery, and local diagnostics;
+- `clipboardWrite` to copy a newly created room code at the user's request;
 - `scripting` to register and inject the packaged content controller; and
 - `activeTab` for the user-initiated current-tab flow.
 
@@ -72,14 +72,15 @@ user selects “Enable on this site.” The options page also offers an explicit
 grant. Access can be revoked through the browser at any time; revocation unregisters future
 injection and tells an already-running controller to clean up.
 
-The extension does not request cookies, history, downloads, tab capture, microphone, camera,
-geolocation, request interception, or browsing-history permissions.
+The extension never reads clipboard contents. It does not request cookies, history,
+downloads, tab capture, microphone, camera, geolocation, request interception, or
+browsing-history permissions.
 
 ## User choices
 
-Users can leave or end a room, revoke site access, change or remove the synchronization
-service, hide the page badge, export sanitized diagnostics, clear diagnostics, or uninstall
-the extension. Uninstalling removes browser-managed local extension data.
+Users can leave or end a room, revoke site access, hide the page badge, export sanitized
+diagnostics, clear diagnostics, or uninstall the extension. Uninstalling removes
+browser-managed local extension data.
 
-No public synchronization service is bundled or deployed by this source release. The local
-default is `ws://127.0.0.1:8787/ws`. Operators must use HTTPS/WSS for a public deployment.
+Release builds include the service address. Development builds use the local service by
+default. Operators of separate public deployments must use HTTPS/WSS.

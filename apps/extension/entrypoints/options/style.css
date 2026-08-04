@@ -153,7 +153,6 @@ label {
   margin: 0 0 8px;
 }
 
-input[type="url"],
 select {
   background: var(--background-primary);
   border: 1px solid var(--content-primary);

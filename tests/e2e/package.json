@@ -1,10 +1,10 @@
 {
   "name": "@watch-sync/e2e",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "prepare:extension": "pnpm --filter @watch-sync/protocol build && pnpm --filter @watch-sync/sync-core build && pnpm --filter @watch-sync/extension build:chrome && node prepare-extension.mjs",
+    "prepare:extension": "pnpm --filter @watch-sync/protocol build && pnpm --filter @watch-sync/sync-core build && pnpm --filter @watch-sync/extension build:chrome:test && node prepare-extension.mjs",
     "test": "pnpm prepare:extension && pnpm --filter @watch-sync/server build && playwright test",
     "test:public-smoke": "pnpm --filter @watch-sync/extension build:chrome && node public-smoke.mjs",
     "typecheck": "tsc --noEmit",

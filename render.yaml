@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: two-person-video-sync-jubjub-cpu
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./apps/server/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    numInstances: 1
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: TRUST_PROXY
+        value: "true"
+      - key: REQUIRE_SECURE_WEBSOCKET
+        value: "true"
+      - key: ALLOW_EXTENSION_ORIGINS
+        value: "true"
+      - key: ALLOW_LOCALHOST_ORIGINS
+        value: "false"
+      - key: ALLOW_MISSING_ORIGIN
+        value: "false"

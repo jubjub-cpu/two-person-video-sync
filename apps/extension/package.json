@@ -1,6 +1,6 @@
 {
   "name": "@watch-sync/extension",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,6 +9,7 @@
     "prepare": "wxt prepare",
     "build": "pnpm build:chrome && pnpm build:firefox",
     "build:chrome": "wxt build -b chrome --mv3",
+    "build:chrome:test": "wxt build -b chrome --mv3 --mode testing",
     "build:firefox": "wxt build -b firefox --mv3",
     "package:chrome": "wxt zip -b chrome --mv3",
     "package:firefox": "wxt zip -b firefox --mv3",
