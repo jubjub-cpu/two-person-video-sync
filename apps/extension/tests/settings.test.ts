@@ -5,6 +5,7 @@ import {
   normalizeServerUrl,
   normalizeThemeMode,
   originPatternForUrl,
+  PUBLIC_SYNC_SERVER_URL,
   resolveSyncServerUrl,
 } from "../lib/settings";
 
@@ -36,6 +37,8 @@ describe("settings safety", () => {
   });
 
   it("resolves a bundled relay without accepting unsafe transport", () => {
+    expect(PUBLIC_SYNC_SERVER_URL).toBe("wss://two-person-video-sync-jubjub-cpu.onrender.com/ws");
+    expect(resolveSyncServerUrl(PUBLIC_SYNC_SERVER_URL)).toBe(PUBLIC_SYNC_SERVER_URL);
     expect(resolveSyncServerUrl("wss://sync.example.test")).toBe("wss://sync.example.test/ws");
     expect(() => resolveSyncServerUrl("ws://sync.example.test/ws")).toThrow(
       "bundled synchronization service address is invalid",

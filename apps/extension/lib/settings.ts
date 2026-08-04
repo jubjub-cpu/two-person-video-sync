@@ -10,8 +10,13 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
 };
 
 const DEVELOPMENT_SYNC_SERVER_URL = "ws://127.0.0.1:8787/ws";
+export const PUBLIC_SYNC_SERVER_URL = "wss://two-person-video-sync-jubjub-cpu.onrender.com/ws";
+const localBuildModes = new Set(["development", "test", "testing"]);
 const BUNDLED_SYNC_SERVER_URL =
-  import.meta.env.WXT_SYNC_SERVER_URL?.trim() || DEVELOPMENT_SYNC_SERVER_URL;
+  import.meta.env.WXT_SYNC_SERVER_URL?.trim() ||
+  (localBuildModes.has(import.meta.env.MODE)
+    ? DEVELOPMENT_SYNC_SERVER_URL
+    : PUBLIC_SYNC_SERVER_URL);
 
 export const SETTINGS_KEY = "settings";
 

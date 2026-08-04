@@ -972,8 +972,7 @@ export default defineBackground(() => {
     });
   };
 
-  const makeClient = async (tabId: number, restored?: StoredSession): Promise<RoomClient> => {
-    const settings = await getSettings();
+  const makeClient = (tabId: number, restored?: StoredSession): RoomClient => {
     const client = new RoomClient({
       tabId,
       serverUrl: SYNC_SERVER_URL,
@@ -1097,12 +1096,12 @@ export default defineBackground(() => {
         await injectCurrent(request.tabId);
         return popupState(request.tabId);
       case "popup/create-room": {
-        const client = clients.get(request.tabId) ?? (await makeClient(request.tabId));
+        const client = clients.get(request.tabId) ?? makeClient(request.tabId);
         await client.create(request.controlMode);
         return client.view();
       }
       case "popup/join-room": {
-        const client = clients.get(request.tabId) ?? (await makeClient(request.tabId));
+        const client = clients.get(request.tabId) ?? makeClient(request.tabId);
         await client.join(request.roomCode);
         return client.view();
       }
@@ -1266,7 +1265,7 @@ export default defineBackground(() => {
       try {
         await browser.tabs.get(tabId);
         persisted.set(tabId, session);
-        const client = await makeClient(tabId, session);
+        const client = makeClient(tabId, session);
         void client.restore().catch(() => undefined);
       } catch {
         persisted.delete(tabId);

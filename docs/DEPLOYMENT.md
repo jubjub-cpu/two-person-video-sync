@@ -2,6 +2,10 @@
 
 The released extension uses its bundled secure relay. These instructions are for maintainers who want to operate a separate instance and build the extension for it.
 
+The public relay bundled with version 0.2.0 is
+`wss://two-person-video-sync-jubjub-cpu.onrender.com/ws`. Its health endpoint is
+`https://two-person-video-sync-jubjub-cpu.onrender.com/health`.
+
 ## Deploy with Render
 
 1. Open [Deploy to Render](https://render.com/deploy?repo=https://github.com/jubjub-cpu/two-person-video-sync).
