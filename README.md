@@ -19,7 +19,7 @@ Firefox Add-ons reviews are approved. Source and reviewer packages remain availa
 
 ### Firefox
 
-1. Download `vyzync-firefox-unsigned-0.3.0.zip`.
+1. Download `vyzync-firefox-0.3.0.zip`.
 2. Extract the ZIP.
 3. Open `about:debugging#/runtime/this-firefox`.
 4. Select **Load Temporary Add-on** and choose `manifest.json` from the extracted folder.
