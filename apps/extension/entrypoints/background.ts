@@ -242,6 +242,41 @@ class RoomClient {
     await response;
   }
 
+  async reconnectNow(): Promise<void> {
+    if (!this.session) throw new Error("Join or create a room first.");
+    if (this.session.reconnectExpiresAt <= Date.now()) {
+      this.close(true);
+      throw new Error("This room can no longer reconnect. Create or join a new room.");
+    }
+
+    this.updateRoom({
+      status: "reconnecting",
+      message: "Reconnecting now…",
+      reconnecting: true,
+    });
+    const activeConnection = this.connecting;
+    this.close(false);
+    if (activeConnection) {
+      try {
+        await activeConnection;
+      } catch {
+        // The old connection was intentionally closed before starting a fresh one.
+      }
+    }
+
+    try {
+      await this.restore();
+    } catch (error) {
+      this.updateRoom({
+        status: "reconnecting",
+        message: "Could not reconnect yet. Trying again…",
+        reconnecting: true,
+      });
+      this.scheduleReconnect();
+      throw error;
+    }
+  }
+
   async leave(endRoom: boolean): Promise<void> {
     if (this.session && this.socket?.readyState === WebSocket.OPEN) {
       const authenticated = this.envelope();
@@ -425,8 +460,14 @@ class RoomClient {
 
   close(clearSession: boolean): void {
     this.intentionalClose = true;
-    if (this.reconnectTimer) globalThis.clearTimeout(this.reconnectTimer);
-    if (this.heartbeat) globalThis.clearInterval(this.heartbeat);
+    if (this.reconnectTimer) {
+      globalThis.clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = undefined;
+    }
+    if (this.heartbeat) {
+      globalThis.clearInterval(this.heartbeat);
+      this.heartbeat = undefined;
+    }
     this.pending.forEach(({ reject, timer }) => {
       globalThis.clearTimeout(timer);
       reject(new Error("The room connection closed."));
@@ -1109,7 +1150,9 @@ export default defineBackground(() => {
         const client = clients.get(request.tabId);
         await client?.leave(request.endRoom);
         clients.delete(request.tabId);
-        return defaultRoom((await getSettings()).defaultControlMode);
+        const room = defaultRoom((await getSettings()).defaultControlMode);
+        broadcastRoom(request.tabId, room);
+        return room;
       }
       case "popup/set-control-mode": {
         const client = clients.get(request.tabId);
@@ -1147,6 +1190,22 @@ export default defineBackground(() => {
       case "content/action":
         if (contentTabId !== undefined) clients.get(contentTabId)?.submitAction(request.action);
         return undefined;
+      case "content/reconnect": {
+        if (contentTabId === undefined) throw new Error("This tab is unavailable.");
+        const client = clients.get(contentTabId);
+        if (!client) throw new Error("Join or create a room first.");
+        await client.reconnectNow();
+        return client.view();
+      }
+      case "content/leave-room": {
+        if (contentTabId === undefined) throw new Error("This tab is unavailable.");
+        const client = clients.get(contentTabId);
+        await client?.leave(request.endRoom);
+        clients.delete(contentTabId);
+        const room = defaultRoom((await getSettings()).defaultControlMode);
+        broadcastRoom(contentTabId, room);
+        return room;
+      }
       case "content/autoplay-blocked":
         if (contentTabId !== undefined) clients.get(contentTabId)?.markAutoplayBlocked();
         return undefined;

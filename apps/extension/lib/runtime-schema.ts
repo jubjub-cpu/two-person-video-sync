@@ -168,6 +168,14 @@ export const RuntimeRequestSchema = z.discriminatedUnion("type", [
       action: LocalMediaActionSchema,
     })
     .strict(),
+  z.object({ type: z.literal("content/reconnect"), requestId }).strict(),
+  z
+    .object({
+      type: z.literal("content/leave-room"),
+      requestId,
+      endRoom: z.boolean(),
+    })
+    .strict(),
   z
     .object({
       type: z.literal("content/mismatch"),

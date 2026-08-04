@@ -56,6 +56,9 @@ async function launchProfile(label: string, pathname = "single.html"): Promise<P
       "--no-default-browser-check",
     ],
   });
+  await context.grantPermissions(["clipboard-read", "clipboard-write"], {
+    origin: "http://127.0.0.1:4173",
+  });
   const worker =
     context.serviceWorkers()[0] ??
     (await context.waitForEvent("serviceworker", { timeout: 15_000 }));
@@ -177,6 +180,24 @@ test("two isolated extension profiles create, join, synchronize, recover, and av
     const roomCode = (await host.popup.locator("#room-code-display").textContent())?.trim();
     expect(roomCode).toMatch(/^[2-9A-HJ-NP-Z]{16}$/);
 
+    const hostBadge = host.fixture.locator("[data-two-person-video-sync='badge']");
+    const hostBadgeToggle = hostBadge.locator(".badge-toggle");
+    await expect(hostBadgeToggle).toHaveAttribute("aria-expanded", "false");
+    await hostBadgeToggle.click();
+    await expect(hostBadge.locator(".menu")).toBeVisible();
+    await expect(hostBadge.locator(".friend-value")).toHaveText("Disconnected");
+    await expect(hostBadge.locator(".quality-value")).toHaveText("Unavailable");
+    await expect(hostBadge.locator("[data-action='copy']")).toBeEnabled();
+    await expect(hostBadge.locator("[data-action='reconnect']")).toBeEnabled();
+    await expect(hostBadge.locator("[data-action='leave']")).toBeEnabled();
+
+    await hostBadge.locator("[data-action='copy']").click();
+    await expect
+      .poll(() => host.fixture.evaluate(() => navigator.clipboard.readText()))
+      .toBe(roomCode);
+    await expect(hostBadge.locator(".feedback")).toHaveText("Room code copied.");
+    await hostBadgeToggle.click();
+
     await host.fixture.locator("#main-video").evaluate((element) => {
       (element as HTMLVideoElement).currentTime = 1;
     });
@@ -185,6 +206,35 @@ test("two isolated extension profiles create, join, synchronize, recover, and av
     await guest.popup.locator("#join-form button[type='submit']").click();
     await expect(guest.popup.locator("#participant-count")).toHaveText("2 of 2");
     await expect(host.popup.locator("#participant-count")).toHaveText("2 of 2");
+    await hostBadgeToggle.click();
+    await expect(hostBadge.locator(".friend-value")).toHaveText("Connected");
+    await expect(hostBadge.locator(".quality-value")).toHaveText(/^(Good|Fair|Poor) · \d+ ms$/);
+
+    const manualReconnectCountBefore = await host.worker.evaluate(
+      () =>
+        (
+          globalThis as unknown as {
+            __watchSyncTelemetry?: { inbound: string[]; outbound: string[] };
+          }
+        ).__watchSyncTelemetry?.outbound.filter((type) => type === "room.reconnect").length ?? 0,
+    );
+    await hostBadge.locator("[data-action='reconnect']").click();
+    await expect
+      .poll(() =>
+        host.worker.evaluate(
+          () =>
+            (
+              globalThis as unknown as {
+                __watchSyncTelemetry?: { inbound: string[]; outbound: string[] };
+              }
+            ).__watchSyncTelemetry?.outbound.filter((type) => type === "room.reconnect").length ??
+            0,
+        ),
+      )
+      .toBeGreaterThan(manualReconnectCountBefore);
+    await expect(host.popup.locator("#participant-count")).toHaveText("2 of 2");
+    await expect(hostBadge.locator(".feedback")).toHaveText("Reconnected.");
+    await hostBadgeToggle.click();
     await expect
       .poll(async () => Math.abs((await mediaState(guest.fixture)).currentTime - 1))
       .toBeLessThan(0.25);
@@ -372,8 +422,12 @@ test("two isolated extension profiles create, join, synchronize, recover, and av
     expect(Object.values(hostEvents).reduce((sum, value) => sum + value, 0)).toBeLessThan(40);
     expect(Object.values(guestEvents).reduce((sum, value) => sum + value, 0)).toBeLessThan(40);
 
-    await host.popup.locator("#end-room").click();
+    if ((await hostBadgeToggle.getAttribute("aria-expanded")) !== "true") {
+      await hostBadgeToggle.click();
+    }
+    await hostBadge.locator("[data-action='leave']").click();
     await expect(guest.popup.locator("#status-title")).toHaveText("Sync service unavailable");
+    await expect(hostBadge.locator(".title")).toHaveText("Ready");
   } finally {
     await Promise.all([closeProfile(host), closeProfile(guest)]);
   }

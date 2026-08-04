@@ -1,17 +1,18 @@
 import { browser } from "wxt/browser";
 import { DriftController } from "@watch-sync/sync-core";
 
-import { isRuntimeResponse, makeRequestId } from "../bridge";
+import { isRuntimeResponse, makeRequestId, sendRuntimeRequest } from "../bridge";
 import { RuntimeEventSchema } from "../runtime-schema";
 import { compareVideoIdentities } from "../adapters/identity";
 import { createMediaAdapter, type MediaAdapter } from "../adapters/media-adapter";
 import { PlayerDetector } from "../adapters/player-detector";
-import { StatusBadge } from "../badge";
+import { StatusBadge, type StatusBadgeIconUrls } from "../badge";
 import type {
   LocalMediaAction,
   RuntimeEvent,
   RuntimeRequest,
   RuntimeResponse,
+  RoomView,
   SyncStatus,
   ThemeMode,
   VideoSnapshot,
@@ -34,7 +35,7 @@ interface Suppression {
 interface MediaSessionControllerOptions {
   showBadge: boolean;
   themeMode: ThemeMode;
-  closeIconUrl: string;
+  badgeIcons: StatusBadgeIconUrls;
   onDestroy?: () => void;
 }
 
@@ -67,6 +68,7 @@ export class MediaSessionController {
   private initialSyncPending = false;
   private badgeStatus: SyncStatus = "ready";
   private badgeDetail?: string;
+  private badgeRoom?: RoomView;
   private runtimeListener?: Parameters<typeof browser.runtime.onMessage.addListener>[0];
   private readonly boundListeners: Array<[keyof HTMLMediaElementEventMap, EventListener]> = [];
   private readonly onLocationChange = (): void => this.handlePlayersChanged();
@@ -88,9 +90,13 @@ export class MediaSessionController {
       this.badge = undefined;
       return;
     }
-    this.badge ??= new StatusBadge(themeMode, this.options.closeIconUrl);
+    this.badge ??= new StatusBadge(themeMode, this.options.badgeIcons, {
+      onCopyRoomCode: (roomCode) => this.copyRoomCode(roomCode),
+      onReconnect: () => this.reconnectRoom(),
+      onLeaveRoom: (endRoom) => this.leaveRoom(endRoom),
+    });
     this.badge.setThemeMode(themeMode);
-    this.badge.update(this.badgeStatus, this.badgeDetail);
+    this.badge.update(this.badgeStatus, this.badgeDetail, this.badgeRoom);
   }
 
   start(): void {
@@ -275,6 +281,7 @@ export class MediaSessionController {
           this.initialSyncPending = true;
         }
         this.roomActive = event.room.participantCount > 0;
+        this.badgeRoom = event.room;
         this.localCanControl = event.room.role === "host" || event.room.controlMode === "shared";
         if (this.roomActive) this.startSnapshots();
         else this.stopSnapshots();
@@ -541,7 +548,37 @@ export class MediaSessionController {
   private updateBadge(status: SyncStatus, message?: string): void {
     this.badgeStatus = status;
     this.badgeDetail = message;
-    this.badge?.update(status, message);
+    this.badge?.update(status, message, this.badgeRoom);
+  }
+
+  private async copyRoomCode(roomCode: string): Promise<void> {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(roomCode);
+        return;
+      }
+    } catch {
+      // Fall through to the user-gesture copy path for browsers that restrict Clipboard API access.
+    }
+
+    const textArea = document.createElement("textarea");
+    textArea.value = roomCode;
+    textArea.setAttribute("readonly", "");
+    textArea.style.cssText =
+      "position:fixed;left:-10000px;top:0;width:1px;height:1px;opacity:0;pointer-events:none;";
+    document.documentElement.append(textArea);
+    textArea.select();
+    const copied = document.execCommand("copy");
+    textArea.remove();
+    if (!copied) throw new Error("Could not copy the room code.");
+  }
+
+  private async reconnectRoom(): Promise<void> {
+    await sendRuntimeRequest<RoomView>({ type: "content/reconnect" });
+  }
+
+  private async leaveRoom(endRoom: boolean): Promise<void> {
+    await sendRuntimeRequest<RoomView>({ type: "content/leave-room", endRoom });
   }
 
   private async send<T>(message: RuntimeRequest): Promise<T | undefined> {

@@ -10,14 +10,14 @@ Download the files from the [latest release](https://github.com/jubjub-cpu/two-p
 
 ### Chrome
 
-1. Download `video-sync-chrome-0.2.0.zip`.
+1. Download `video-sync-chrome-0.2.1.zip`.
 2. Extract the ZIP.
 3. Open `chrome://extensions` and turn on **Developer mode**.
 4. Select **Load unpacked** and choose the extracted folder.
 
 ### Firefox
 
-1. Download `video-sync-firefox-unsigned-0.2.0.zip`.
+1. Download `video-sync-firefox-unsigned-0.2.1.zip`.
 2. Extract the ZIP.
 3. Open `about:debugging#/runtime/this-firefox`.
 4. Select **Load Temporary Add-on** and choose `manifest.json` from the extracted folder.

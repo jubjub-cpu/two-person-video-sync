@@ -22,7 +22,16 @@ export default defineContentScript({
     const controller = new MediaSessionController({
       showBadge: settings.showBadge,
       themeMode: settings.themeMode,
-      closeIconUrl: browser.runtime.getURL("/icons/ui/x.svg"),
+      badgeIcons: {
+        chevron: browser.runtime.getURL("/icons/ui/chevron-down.svg"),
+        close: browser.runtime.getURL("/icons/ui/x.svg"),
+        copy: browser.runtime.getURL("/icons/ui/copy.svg"),
+        leave: browser.runtime.getURL("/icons/ui/logout.svg"),
+        reconnect: browser.runtime.getURL("/icons/ui/refresh.svg"),
+        userConnected: browser.runtime.getURL("/icons/ui/user-check.svg"),
+        userDisconnected: browser.runtime.getURL("/icons/ui/user-x.svg"),
+        wifi: browser.runtime.getURL("/icons/ui/wifi.svg"),
+      },
       onDestroy: () => {
         browser.storage.onChanged.removeListener(handleSettingsChange);
         delete window[INSTANCE_KEY];
