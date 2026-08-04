@@ -35,6 +35,22 @@ describe("extension runtime message schemas", () => {
     ).toThrow();
   });
 
+  it("accepts bounded in-page reconnect and leave actions", () => {
+    expect(
+      RuntimeRequestSchema.parse({
+        type: "content/reconnect",
+        requestId: "request-2",
+      }),
+    ).toMatchObject({ type: "content/reconnect" });
+    expect(
+      RuntimeRequestSchema.parse({
+        type: "content/leave-room",
+        requestId: "request-3",
+        endRoom: true,
+      }),
+    ).toMatchObject({ type: "content/leave-room", endRoom: true });
+  });
+
   it("accepts a bounded background status event", () => {
     expect(
       RuntimeEventSchema.parse({

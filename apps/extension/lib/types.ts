@@ -124,6 +124,8 @@ export type RuntimeRequest =
       candidates: VideoCandidateSummary[];
     }
   | { type: "content/action"; requestId: string; action: LocalMediaAction }
+  | { type: "content/reconnect"; requestId: string }
+  | { type: "content/leave-room"; requestId: string; endRoom: boolean }
   | {
       type: "content/mismatch";
       requestId: string;

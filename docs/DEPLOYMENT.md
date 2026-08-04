@@ -2,7 +2,7 @@
 
 The released extension uses its bundled secure relay. These instructions are for maintainers who want to operate a separate instance and build the extension for it.
 
-The public relay bundled with version 0.2.0 is
+The public relay bundled with version 0.2.1 is
 `wss://two-person-video-sync-jubjub-cpu.onrender.com/ws`. Its health endpoint is
 `https://two-person-video-sync-jubjub-cpu.onrender.com/health`.
 
@@ -41,13 +41,13 @@ Development and test builds use `ws://127.0.0.1:8787/ws` by default.
 ## Run with Docker
 
 ```powershell
-docker build --file apps/server/Dockerfile --tag two-person-video-sync-server:0.2.0 .
+docker build --file apps/server/Dockerfile --tag two-person-video-sync-server:0.2.1 .
 docker run --rm `
   --name two-person-video-sync-server `
   --publish 8787:8787 `
   --env HOST=0.0.0.0 `
   --env PORT=8787 `
-  two-person-video-sync-server:0.2.0
+  two-person-video-sync-server:0.2.1
 ```
 
 Public deployments must terminate TLS, set `TRUST_PROXY=true`, use `wss://`, keep one service instance, and keep room credentials out of URLs and logs.
