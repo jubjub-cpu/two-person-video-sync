@@ -2,7 +2,7 @@ import type { RoomView, SyncStatus, ThemeMode } from "./types";
 
 const labels: Record<SyncStatus, string> = {
   disabled: "Video Sync off",
-  "no-video": "No supported video found",
+  "no-video": "This player isn’t supported",
   ready: "Ready to sync",
   waiting: "Waiting for the other person",
   connected: "Connected to friend",
@@ -18,7 +18,7 @@ const labels: Record<SyncStatus, string> = {
 
 const compactLabels: Record<SyncStatus, string> = {
   disabled: "Sync off",
-  "no-video": "No video",
+  "no-video": "Unsupported player",
   ready: "Ready",
   waiting: "Waiting",
   connected: "Connected",
@@ -295,34 +295,6 @@ export class StatusBadge {
 
       .menu[hidden] { display: none; }
 
-      .menu-header {
-        align-items: center;
-        border-bottom: 1px solid var(--border);
-        display: flex;
-        justify-content: space-between;
-        min-height: 52px;
-        padding: 9px 10px 9px 14px;
-      }
-
-      .brand { min-width: 0; }
-
-      .eyebrow {
-        color: var(--content-secondary);
-        display: block;
-        font-size: 9px;
-        font-weight: 700;
-        letter-spacing: 0.08em;
-        line-height: 1.2;
-        text-transform: uppercase;
-      }
-
-      .brand strong {
-        display: block;
-        font-size: 14px;
-        line-height: 1.35;
-        margin-top: 2px;
-      }
-
       .icon-button {
         align-items: center;
         background: transparent;
@@ -344,8 +316,8 @@ export class StatusBadge {
         align-items: start;
         display: grid;
         gap: 10px;
-        grid-template-columns: 10px minmax(0, 1fr);
-        padding: 12px 14px;
+        grid-template-columns: 10px minmax(0, 1fr) 32px;
+        padding: 10px 8px 10px 14px;
       }
 
       .current-status .dot { margin-top: 3px; }
@@ -506,17 +478,6 @@ export class StatusBadge {
     this.menu.setAttribute("role", "dialog");
     this.menu.setAttribute("aria-label", "Video Sync room controls");
 
-    const menuHeader = document.createElement("div");
-    menuHeader.className = "menu-header";
-    const brand = document.createElement("div");
-    brand.className = "brand";
-    const eyebrow = document.createElement("span");
-    eyebrow.className = "eyebrow";
-    eyebrow.textContent = "Video Sync";
-    const heading = document.createElement("strong");
-    heading.textContent = "Room controls";
-    brand.append(eyebrow, heading);
-
     const hideButton = document.createElement("button");
     hideButton.type = "button";
     hideButton.className = "icon-button hide-button";
@@ -524,8 +485,6 @@ export class StatusBadge {
     hideButton.setAttribute("aria-label", "Hide Video Sync badge");
     hideButton.append(icon(this.icons.close));
     hideButton.addEventListener("click", () => this.hide());
-    menuHeader.append(brand, hideButton);
-
     const currentStatus = document.createElement("div");
     currentStatus.className = "current-status";
     const expandedDot = document.createElement("span");
@@ -539,7 +498,7 @@ export class StatusBadge {
     this.expandedDetail.className = "expanded-detail";
     this.expandedDetail.hidden = true;
     expandedCopy.append(this.expandedTitle, this.expandedDetail);
-    currentStatus.append(expandedDot, expandedCopy);
+    currentStatus.append(expandedDot, expandedCopy, hideButton);
 
     const metrics = document.createElement("div");
     metrics.className = "metrics";
@@ -592,7 +551,7 @@ export class StatusBadge {
     this.feedback.hidden = true;
     this.feedback.setAttribute("role", "status");
 
-    this.menu.append(menuHeader, currentStatus, metrics, actionList, this.feedback);
+    this.menu.append(currentStatus, metrics, actionList, this.feedback);
 
     this.badge = document.createElement("button");
     this.badge.type = "button";

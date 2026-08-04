@@ -25,6 +25,20 @@
         </div>
       </section>
 
+      <section
+        id="compatibility-notice"
+        class="compatibility-notice"
+        role="status"
+        aria-live="polite"
+        hidden
+      >
+        <span class="compatibility-dot" aria-hidden="true"></span>
+        <div>
+          <strong id="compatibility-title"></strong>
+          <p id="compatibility-message"></p>
+        </div>
+      </section>
+
       <section id="permission-panel" class="panel permission-panel" hidden>
         <span class="eyebrow">Site access</span>
         <h2>Enable on this site</h2>
@@ -163,13 +177,6 @@
         </span>
         <span class="ui-icon icon-chevron" aria-hidden="true"></span>
       </button>
-
-      <footer>
-        <span>Playback state only</span>
-        <a id="privacy-link" href="#" title="Privacy information" aria-label="Privacy information">
-          <span class="ui-icon icon-info" aria-hidden="true"></span>
-        </a>
-      </footer>
     </main>
     <script type="module" src="./main.ts"></script>
   </body>

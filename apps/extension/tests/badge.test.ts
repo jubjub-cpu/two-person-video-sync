@@ -55,6 +55,8 @@ describe("in-page status badge", () => {
 
     expect(toggle?.getAttribute("aria-expanded")).toBe("true");
     expect(menu?.hidden).toBe(false);
+    expect(menu?.textContent).not.toContain("Video Sync");
+    expect(menu?.textContent).not.toContain("Room controls");
     expect(shadow?.querySelector(".expanded-detail")?.textContent).toBe(
       "Playback is synchronized.",
     );

@@ -1,6 +1,6 @@
 {
   "name": "two-person-video-sync",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "description": "Two-person browser extension and playback-state synchronization service.",
   "license": "MIT",

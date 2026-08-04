@@ -1,6 +1,7 @@
 import { browser } from "wxt/browser";
 
 import { sendRuntimeRequest } from "../../lib/bridge";
+import { compatibilityNoticeFor } from "../../lib/compatibility-notice";
 import { getSettings, originPatternForUrl, saveSettings } from "../../lib/settings";
 import { RuntimeEventSchema } from "../../lib/runtime-schema";
 import { applyThemeMode } from "../../lib/theme";
@@ -23,6 +24,9 @@ const elements = {
   statusCard: required<HTMLElement>("status-card"),
   statusTitle: required<HTMLElement>("status-title"),
   statusMessage: required<HTMLElement>("status-message"),
+  compatibilityNotice: required<HTMLElement>("compatibility-notice"),
+  compatibilityTitle: required<HTMLElement>("compatibility-title"),
+  compatibilityMessage: required<HTMLElement>("compatibility-message"),
   permissionPanel: required<HTMLElement>("permission-panel"),
   enableSite: required<HTMLButtonElement>("enable-site"),
   videoPanel: required<HTMLElement>("video-panel"),
@@ -49,7 +53,6 @@ const elements = {
   endRoom: required<HTMLButtonElement>("end-room"),
   error: required<HTMLElement>("error-message"),
   openOptions: required<HTMLButtonElement>("open-options"),
-  privacyLink: required<HTMLAnchorElement>("privacy-link"),
 };
 
 let activeTabId: number | undefined;
@@ -163,8 +166,10 @@ function render(next: PopupState): void {
   if (next.video?.capabilities.canPlay) {
     elements.videoTitle.textContent = next.video.identity.displayTitle;
     elements.videoDetail.textContent = next.video.identity.isLive
-      ? "Live stream · synchronization is limited"
-      : `${next.video.identity.provider.replaceAll("-", " ")} · ${next.video.identity.seekable ? "seekable" : "not seekable"}`;
+      ? "Live video"
+      : next.video.capabilities.canSeek
+        ? "Ready to synchronize"
+        : "Play and pause only";
   }
   elements.pickerToggle.hidden = next.candidates.length <= 1;
   elements.picker.innerHTML = "";
@@ -187,6 +192,24 @@ function render(next: PopupState): void {
     elements.picker.append(button);
   });
   renderRoom(next.room);
+  const compatibilityNotice = compatibilityNoticeFor(next);
+  const replaceRoomStatus =
+    next.room.participantCount === 0 &&
+    (next.room.status === "ready" ||
+      next.room.status === "no-video" ||
+      next.room.status === "disabled");
+  elements.compatibilityNotice.hidden = true;
+  if (compatibilityNotice && replaceRoomStatus) {
+    elements.statusCard.dataset.state =
+      compatibilityNotice.tone === "negative" ? "compatibility-negative" : "compatibility-warning";
+    elements.statusTitle.textContent = compatibilityNotice.title;
+    elements.statusMessage.textContent = compatibilityNotice.message;
+  } else if (compatibilityNotice) {
+    elements.compatibilityNotice.dataset.tone = compatibilityNotice.tone;
+    elements.compatibilityTitle.textContent = compatibilityNotice.title;
+    elements.compatibilityMessage.textContent = compatibilityNotice.message;
+    elements.compatibilityNotice.hidden = false;
+  }
 }
 
 async function refresh(): Promise<void> {
@@ -213,7 +236,7 @@ async function refresh(): Promise<void> {
           : "Browser pages, PDFs, and extension stores cannot be controlled.",
       },
     });
-    if (!supportedPage) showError(error);
+    if (supportedPage) showError(error);
   }
 }
 
@@ -316,11 +339,6 @@ elements.pickerToggle.addEventListener("click", () => {
   elements.pickerToggle.textContent = elements.pickerPanel.hidden ? "Choose video" : "Hide choices";
 });
 elements.openOptions.addEventListener("click", () => void browser.runtime.openOptionsPage());
-elements.privacyLink.addEventListener("click", (event) => {
-  event.preventDefault();
-  void browser.runtime.openOptionsPage();
-});
-
 browser.runtime.onMessage.addListener((message) => {
   const parsed = RuntimeEventSchema.safeParse(message);
   if (!parsed.success) return;

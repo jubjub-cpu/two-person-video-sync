@@ -38,7 +38,8 @@ import type {
 } from "../lib/types";
 
 const CONTENT_SCRIPT_FILE = "/content-scripts/content.js";
-const STORED_SESSIONS_KEY = "activeSessions";
+const STORED_SESSION_KEY = "activeSession";
+const LEGACY_STORED_SESSIONS_KEY = "activeSessions";
 const SOCKET_HEARTBEAT_MS = 20_000;
 const REQUEST_TIMEOUT_MS = 10_000;
 const SOCKET_ATTEMPT_TIMEOUT_MS = 8_000;
@@ -58,7 +59,7 @@ interface PendingRequest {
 }
 
 interface RoomClientOptions {
-  tabId: number;
+  initialTabId: number;
   serverUrl: string;
   onRoom: (room: RoomView) => void;
   onEvent: (event: RuntimeEvent) => void;
@@ -74,6 +75,25 @@ function defaultRoom(controlMode: ControlMode = "host-only"): RoomView {
     status: "ready",
     message: "Video found and ready.",
   };
+}
+
+function isStoredSession(value: unknown): value is StoredSession {
+  if (!value || typeof value !== "object") return false;
+  const session = value as Partial<StoredSession>;
+  return (
+    Number.isSafeInteger(session.tabId) &&
+    (session.tabId ?? 0) > 0 &&
+    typeof session.roomCode === "string" &&
+    typeof session.roomId === "string" &&
+    (session.role === "host" || session.role === "guest") &&
+    typeof session.participantId === "string" &&
+    typeof session.sessionId === "string" &&
+    typeof session.reconnectToken === "string" &&
+    typeof session.reconnectExpiresAt === "number" &&
+    (session.controlMode === "host-only" || session.controlMode === "shared") &&
+    Number.isSafeInteger(session.lastServerSequence) &&
+    Number.isSafeInteger(session.clientSequence)
+  );
 }
 
 function protocolVideo(snapshot: VideoSnapshot): VideoState {
@@ -162,8 +182,10 @@ class RoomClient {
   private lastSentVideoFingerprint?: string;
   private compatibility: "unknown" | "compatible" | "blocked" = "unknown";
   private endResolver?: () => void;
+  private activeTabId: number;
 
   constructor(private readonly options: RoomClientOptions) {
+    this.activeTabId = options.restored?.tabId ?? options.initialTabId;
     this.session = options.restored;
     this.room = options.restored
       ? {
@@ -181,6 +203,21 @@ class RoomClient {
 
   view(): RoomView {
     return { ...this.room };
+  }
+
+  activateTab(tabId: number): void {
+    if (this.activeTabId === tabId) return;
+    this.activeTabId = tabId;
+    this.lastSentVideoFingerprint = undefined;
+    this.compatibility = "unknown";
+    if (this.session) {
+      this.session.tabId = tabId;
+      this.persist();
+      this.updateRoom({
+        status: "waiting",
+        message: "Video tab changed. Waiting to verify the new video before resuming.",
+      });
+    }
   }
 
   async create(controlMode: ControlMode): Promise<void> {
@@ -332,13 +369,13 @@ class RoomClient {
       if (!safeToSynchronize) {
         this.updateRoom({
           status: "mismatch",
-          message: "The two tabs appear to have different or incompatible videos.",
+          message: "The videos don’t match. Open the same video in both browsers.",
           peerVideo: safeVideo(this.peerVideo.identity, this.peerVideo.capabilities),
         });
       } else if (this.room.status === "mismatch") {
         this.updateRoom({
           status: "connected",
-          message: "Video identities match. Synchronization is active.",
+          message: "The videos match. Sync is active.",
         });
       }
     }
@@ -449,7 +486,6 @@ class RoomClient {
 
   suspendForNavigation(): void {
     if (!this.session) return;
-    this.peerVideo = undefined;
     this.lastSentVideoFingerprint = undefined;
     this.compatibility = "unknown";
     this.updateRoom({
@@ -702,7 +738,7 @@ class RoomClient {
         this.close(true);
         this.updateRoom({
           status: "offline",
-          message: "The extension and server use incompatible protocol versions.",
+          message: "This extension version can’t connect. Update it and try again.",
         });
         break;
     }
@@ -713,7 +749,7 @@ class RoomClient {
     this.peerVideo = undefined;
     this.compatibility = "unknown";
     this.session = {
-      tabId: this.options.tabId,
+      tabId: this.activeTabId,
       roomCode: message.roomCode,
       roomId: message.roomId,
       role: message.role,
@@ -769,15 +805,15 @@ class RoomClient {
       this.updateRoom({
         status: "mismatch",
         message: comparison.compatible
-          ? "Synchronization is paused for an ad or unsupported player state."
-          : "The two tabs appear to have different or incompatible videos.",
+          ? "Sync is paused while an ad is playing or the player is unavailable."
+          : "The videos don’t match. Open the same video in both browsers.",
         peerVideo: safeVideo(video.identity, video.capabilities),
       });
     } else {
       this.compatibility = "compatible";
       this.updateRoom({
         status: "connected",
-        message: "Video identities match. Synchronization is active.",
+        message: "The videos match. Sync is active.",
         peerVideo: safeVideo(video.identity, video.capabilities),
       });
     }
@@ -983,12 +1019,13 @@ function scriptRegistrationId(originPattern: string): string {
 }
 
 export default defineBackground(() => {
-  const clients = new Map<number, RoomClient>();
+  let roomClient: RoomClient | undefined;
+  let activeTabId: number | undefined;
+  let persistedSession: StoredSession | undefined;
   const snapshots = new Map<number, VideoSnapshot>();
   const candidates = new Map<number, PopupState["candidates"]>();
   const injectedTabs = new Set<number>();
   const tabOrigins = new Map<number, string>();
-  const persisted = new Map<number, StoredSession>();
 
   const sendToTab = async (tabId: number, event: RuntimeEvent): Promise<void> => {
     try {
@@ -998,37 +1035,63 @@ export default defineBackground(() => {
     }
   };
 
-  const broadcastRoom = (tabId: number, room: RoomView): void => {
-    void sendToTab(tabId, { type: "background/room-state", room });
+  const sendToActiveTab = (event: RuntimeEvent): void => {
+    if (activeTabId !== undefined) void sendToTab(activeTabId, event);
+  };
+
+  const broadcastRoom = (room: RoomView): void => {
+    for (const tabId of injectedTabs) {
+      void sendToTab(tabId, { type: "background/room-state", room });
+    }
     void browser.runtime
       .sendMessage({ type: "background/room-state", room })
       .catch(() => undefined);
   };
 
-  const persistSessions = async (): Promise<void> => {
-    await browser.storage.local.set({
-      [STORED_SESSIONS_KEY]: Object.fromEntries(
-        [...persisted.entries()].map(([tabId, session]) => [String(tabId), session]),
-      ),
-    });
+  const persistSession = async (): Promise<void> => {
+    if (persistedSession) {
+      await browser.storage.local.set({ [STORED_SESSION_KEY]: persistedSession });
+    } else {
+      await browser.storage.local.remove(STORED_SESSION_KEY);
+    }
+    await browser.storage.local.remove(LEGACY_STORED_SESSIONS_KEY);
   };
 
-  const makeClient = (tabId: number, restored?: StoredSession): RoomClient => {
+  const makeClient = (initialTabId: number, restored?: StoredSession): RoomClient => {
     const client = new RoomClient({
-      tabId,
+      initialTabId,
       serverUrl: SYNC_SERVER_URL,
       restored,
-      getSnapshot: () => snapshots.get(tabId),
-      onRoom: (room) => broadcastRoom(tabId, room),
-      onEvent: (event) => void sendToTab(tabId, event),
+      getSnapshot: () => (activeTabId === undefined ? undefined : snapshots.get(activeTabId)),
+      onRoom: broadcastRoom,
+      onEvent: sendToActiveTab,
       onPersist: (session) => {
-        if (session) persisted.set(tabId, session);
-        else persisted.delete(tabId);
-        void persistSessions();
+        persistedSession = session;
+        void persistSession();
       },
     });
-    clients.set(tabId, client);
+    roomClient = client;
     return client;
+  };
+
+  const activateRoomTab = (tabId: number, requestSnapshot = true): void => {
+    const changed = activeTabId !== tabId;
+    activeTabId = tabId;
+    if (changed) roomClient?.activateTab(tabId);
+    if (!roomClient) return;
+    broadcastRoom(roomClient.view());
+    if (requestSnapshot) {
+      void sendToTab(tabId, { type: "background/request-snapshot" });
+    }
+  };
+
+  const resetRoom = async (): Promise<RoomView> => {
+    roomClient = undefined;
+    persistedSession = undefined;
+    await persistSession();
+    const room = defaultRoom((await getSettings()).defaultControlMode);
+    broadcastRoom(room);
+    return room;
   };
 
   const registerOrigin = async (originPattern: string): Promise<void> => {
@@ -1078,6 +1141,11 @@ export default defineBackground(() => {
     return pattern ? browser.permissions.contains({ origins: [pattern] }) : false;
   };
 
+  const isFocusedTab = async (tabId: number): Promise<boolean> => {
+    const [focused] = await browser.tabs.query({ active: true, lastFocusedWindow: true });
+    return focused?.id === tabId;
+  };
+
   const popupState = async (tabId: number): Promise<PopupState> => {
     const settings = await getSettings();
     let tabUrl = "";
@@ -1097,7 +1165,7 @@ export default defineBackground(() => {
       }
     }
     const snapshot = snapshots.get(tabId);
-    const client = clients.get(tabId);
+    const client = roomClient;
     const room = client?.view() ?? {
       ...defaultRoom(settings.defaultControlMode),
       status: !supportedPage
@@ -1108,12 +1176,12 @@ export default defineBackground(() => {
             ? "ready"
             : "no-video",
       message: !supportedPage
-        ? "Browser pages, PDFs, and extension stores cannot be controlled."
+        ? "Open a regular video page and try again."
         : !enabled
           ? "Enable access to detect and control the video on this site."
           : snapshot?.capabilities.canPlay
             ? "Video found and ready."
-            : "No controllable HTML5 video was found on this page.",
+            : "Try another video or site.",
     };
     return {
       enabled,
@@ -1137,37 +1205,47 @@ export default defineBackground(() => {
         await injectCurrent(request.tabId);
         return popupState(request.tabId);
       case "popup/create-room": {
-        const client = clients.get(request.tabId) ?? makeClient(request.tabId);
+        if (roomClient?.view().participantCount) {
+          throw new Error("Leave the current room before creating another one.");
+        }
+        activeTabId = request.tabId;
+        const client = roomClient ?? makeClient(request.tabId);
+        client.activateTab(request.tabId);
         await client.create(request.controlMode);
         return client.view();
       }
       case "popup/join-room": {
-        const client = clients.get(request.tabId) ?? makeClient(request.tabId);
+        if (roomClient?.view().participantCount) {
+          throw new Error("Leave the current room before joining another one.");
+        }
+        activeTabId = request.tabId;
+        const client = roomClient ?? makeClient(request.tabId);
+        client.activateTab(request.tabId);
         await client.join(request.roomCode);
         return client.view();
       }
       case "popup/leave-room": {
-        const client = clients.get(request.tabId);
-        await client?.leave(request.endRoom);
-        clients.delete(request.tabId);
-        const room = defaultRoom((await getSettings()).defaultControlMode);
-        broadcastRoom(request.tabId, room);
-        return room;
+        await roomClient?.leave(request.endRoom);
+        return resetRoom();
       }
       case "popup/set-control-mode": {
-        const client = clients.get(request.tabId);
+        const client = roomClient;
         if (!client) throw new Error("No active room.");
         client.setControlMode(request.mode);
         return client.view();
       }
       case "popup/select-video":
+        activateRoomTab(request.tabId, false);
         await sendToTab(request.tabId, {
           type: "background/select-video",
           candidateId: request.candidateId,
         });
         return undefined;
       case "popup/user-ready": {
-        await sendToTab(request.tabId, { type: "background/user-ready" });
+        if (snapshots.get(request.tabId)?.capabilities.canPlay) {
+          activateRoomTab(request.tabId, false);
+        }
+        await sendToTab(activeTabId ?? request.tabId, { type: "background/user-ready" });
         return undefined;
       }
       case "content/hello": {
@@ -1175,48 +1253,61 @@ export default defineBackground(() => {
         injectedTabs.add(contentTabId);
         const originPattern = originPatternForUrl(sender.url ?? "");
         if (originPattern) tabOrigins.set(contentTabId, originPattern);
-        const restored = clients.get(contentTabId);
-        if (restored) broadcastRoom(contentTabId, restored.view());
+        if (roomClient) {
+          await sendToTab(contentTabId, {
+            type: "background/room-state",
+            room: roomClient.view(),
+          });
+        }
         await sendToTab(contentTabId, { type: "background/request-snapshot" });
-        return restored?.view();
+        return roomClient?.view();
       }
       case "content/snapshot": {
         if (contentTabId === undefined) return undefined;
         snapshots.set(contentTabId, request.snapshot);
         candidates.set(contentTabId, request.candidates);
-        clients.get(contentTabId)?.updateSnapshot(request.snapshot);
+        if (
+          roomClient &&
+          contentTabId !== activeTabId &&
+          sender.tab?.active &&
+          request.snapshot.capabilities.canPlay &&
+          (await isFocusedTab(contentTabId))
+        ) {
+          activateRoomTab(contentTabId, false);
+        }
+        if (contentTabId === activeTabId) roomClient?.updateSnapshot(request.snapshot);
         return undefined;
       }
       case "content/action":
-        if (contentTabId !== undefined) clients.get(contentTabId)?.submitAction(request.action);
+        if (contentTabId !== undefined && contentTabId === activeTabId) {
+          roomClient?.submitAction(request.action);
+        }
         return undefined;
       case "content/reconnect": {
         if (contentTabId === undefined) throw new Error("This tab is unavailable.");
-        const client = clients.get(contentTabId);
+        const client = roomClient;
         if (!client) throw new Error("Join or create a room first.");
         await client.reconnectNow();
         return client.view();
       }
       case "content/leave-room": {
         if (contentTabId === undefined) throw new Error("This tab is unavailable.");
-        const client = clients.get(contentTabId);
-        await client?.leave(request.endRoom);
-        clients.delete(contentTabId);
-        const room = defaultRoom((await getSettings()).defaultControlMode);
-        broadcastRoom(contentTabId, room);
-        return room;
+        await roomClient?.leave(request.endRoom);
+        return resetRoom();
       }
       case "content/autoplay-blocked":
-        if (contentTabId !== undefined) clients.get(contentTabId)?.markAutoplayBlocked();
+        if (contentTabId !== undefined && contentTabId === activeTabId) {
+          roomClient?.markAutoplayBlocked();
+        }
         return undefined;
       case "content/ready-state":
-        if (contentTabId !== undefined) {
-          clients.get(contentTabId)?.setReady(request.autoplayUnlocked);
+        if (contentTabId !== undefined && contentTabId === activeTabId) {
+          roomClient?.setReady(request.autoplayUnlocked);
         }
         return undefined;
       case "content/mismatch":
-        if (contentTabId !== undefined) {
-          clients.get(contentTabId)?.markMismatch(request.remote, request.reason);
+        if (contentTabId !== undefined && contentTabId === activeTabId) {
+          roomClient?.markMismatch(request.remote, request.reason);
         }
         return undefined;
       case "options/get-diagnostics":
@@ -1246,44 +1337,58 @@ export default defineBackground(() => {
   });
 
   browser.tabs.onRemoved.addListener((tabId) => {
-    const client = clients.get(tabId);
-    void client?.leave(false);
-    clients.delete(tabId);
+    if (activeTabId === tabId) {
+      activeTabId = undefined;
+      roomClient?.suspendForNavigation();
+    }
     snapshots.delete(tabId);
     candidates.delete(tabId);
     injectedTabs.delete(tabId);
     tabOrigins.delete(tabId);
   });
 
+  browser.tabs.onActivated.addListener(({ tabId }) => {
+    void (async () => {
+      if (!roomClient || !(await isFocusedTab(tabId))) return;
+      const snapshot = snapshots.get(tabId);
+      if (snapshot?.capabilities.canPlay) {
+        activateRoomTab(tabId);
+        return;
+      }
+      try {
+        if (!(await enabledForTab(tabId))) return;
+        await injectCurrent(tabId);
+        await sendToTab(tabId, { type: "background/request-snapshot" });
+      } catch {
+        // Unsupported and still-loading pages do not replace the current video tab.
+      }
+    })();
+  });
+
   browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
     if (changeInfo.status === "loading") {
-      clients.get(tabId)?.suspendForNavigation();
+      if (activeTabId === tabId) roomClient?.suspendForNavigation();
       injectedTabs.delete(tabId);
       snapshots.delete(tabId);
       candidates.delete(tabId);
       tabOrigins.delete(tabId);
       return;
     }
-    if (changeInfo.status === "complete" && clients.has(tabId)) {
+    if (changeInfo.status === "complete" && roomClient) {
       void (async () => {
-        let enabled = false;
+        let tab: Browser.tabs.Tab;
         try {
-          enabled = await enabledForTab(tabId);
+          tab = await browser.tabs.get(tabId);
         } catch {
-          enabled = false;
-        }
-        if (!enabled) {
-          void clients.get(tabId)?.leave(false);
-          clients.delete(tabId);
-          persisted.delete(tabId);
-          await persistSessions();
           return;
         }
+        if (activeTabId !== tabId && !tab.active) return;
         try {
+          if (!(await enabledForTab(tabId))) return;
           await injectCurrent(tabId);
           await sendToTab(tabId, { type: "background/request-snapshot" });
         } catch {
-          // A following navigation event will retry or close the stale session.
+          // A following navigation or activation event will retry the handoff.
         }
       })();
     }
@@ -1295,6 +1400,10 @@ export default defineBackground(() => {
       for (const [tabId, origin] of tabOrigins) {
         if (await browser.permissions.contains({ origins: [origin] })) continue;
         await sendToTab(tabId, { type: "background/deactivate" });
+        if (activeTabId === tabId) {
+          activeTabId = undefined;
+          roomClient?.suspendForNavigation();
+        }
         injectedTabs.delete(tabId);
         snapshots.delete(tabId);
         candidates.delete(tabId);
@@ -1313,23 +1422,31 @@ export default defineBackground(() => {
 
   void (async () => {
     await reconcilePermissions();
-    const stored = await browser.storage.local.get(STORED_SESSIONS_KEY);
-    const sessions =
-      stored[STORED_SESSIONS_KEY] && typeof stored[STORED_SESSIONS_KEY] === "object"
-        ? (stored[STORED_SESSIONS_KEY] as Record<string, StoredSession>)
-        : {};
-    for (const [tabIdText, session] of Object.entries(sessions)) {
-      const tabId = Number(tabIdText);
-      if (!Number.isSafeInteger(tabId) || session.reconnectExpiresAt <= Date.now()) continue;
-      try {
-        await browser.tabs.get(tabId);
-        persisted.set(tabId, session);
-        const client = makeClient(tabId, session);
-        void client.restore().catch(() => undefined);
-      } catch {
-        persisted.delete(tabId);
-      }
+    const stored = await browser.storage.local.get([
+      STORED_SESSION_KEY,
+      LEGACY_STORED_SESSIONS_KEY,
+    ]);
+    const legacy =
+      stored[LEGACY_STORED_SESSIONS_KEY] && typeof stored[LEGACY_STORED_SESSIONS_KEY] === "object"
+        ? Object.values(stored[LEGACY_STORED_SESSIONS_KEY] as Record<string, unknown>)
+        : [];
+    const session = [stored[STORED_SESSION_KEY], ...legacy]
+      .filter(isStoredSession)
+      .filter((candidate) => candidate.reconnectExpiresAt > Date.now())
+      .sort((left, right) => right.reconnectExpiresAt - left.reconnectExpiresAt)[0];
+    if (!session) {
+      await persistSession();
+      return;
     }
-    await persistSessions();
+    persistedSession = session;
+    try {
+      await browser.tabs.get(session.tabId);
+      activeTabId = session.tabId;
+    } catch {
+      activeTabId = undefined;
+    }
+    const client = makeClient(session.tabId, session);
+    void client.restore().catch(() => undefined);
+    await persistSession();
   })();
 });
