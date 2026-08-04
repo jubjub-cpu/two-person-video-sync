@@ -1,4 +1,4 @@
-# Two Person Video Sync
+# Vyzync
 
 A Chrome and Firefox extension that keeps play, pause, seeking, and playback speed synchronized for two people watching the same HTML5 video.
 
@@ -6,23 +6,26 @@ Each person streams the video from their own account. The extension does not sha
 
 ## Install
 
-Download the files from the [latest release](https://github.com/jubjub-cpu/two-person-video-sync/releases/latest).
+Official one-click installation links will be added here after the first Chrome Web Store and
+Firefox Add-ons reviews are approved. Source and reviewer packages remain available from the
+[latest release](https://github.com/jubjub-cpu/two-person-video-sync/releases/latest).
 
 ### Chrome
 
-1. Download `video-sync-chrome-0.2.2.zip`.
+1. Download `vyzync-chrome-0.3.0.zip`.
 2. Extract the ZIP.
 3. Open `chrome://extensions` and turn on **Developer mode**.
 4. Select **Load unpacked** and choose the extracted folder.
 
 ### Firefox
 
-1. Download `video-sync-firefox-unsigned-0.2.2.zip`.
+1. Download `vyzync-firefox-unsigned-0.3.0.zip`.
 2. Extract the ZIP.
 3. Open `about:debugging#/runtime/this-firefox`.
 4. Select **Load Temporary Add-on** and choose `manifest.json` from the extracted folder.
 
-Firefox removes temporary add-ons when the browser closes. Permanent browser installation requires publication through the Chrome Web Store or Firefox Add-ons.
+Firefox removes temporary add-ons when the browser closes. Use the official store release for
+permanent installation and automatic updates.
 
 ## Use
 

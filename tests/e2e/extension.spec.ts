@@ -192,7 +192,7 @@ test("two isolated extension profiles create, join, synchronize, recover, and av
     const roomCode = (await host.popup.locator("#room-code-display").textContent())?.trim();
     expect(roomCode).toMatch(/^[2-9A-HJ-NP-Z]{16}$/);
 
-    const hostBadge = host.fixture.locator("[data-two-person-video-sync='badge']");
+    const hostBadge = host.fixture.locator("[data-vyzync='badge']");
     const hostBadgeToggle = hostBadge.locator(".badge-toggle");
     await expect(hostBadgeToggle).toHaveAttribute("aria-expanded", "false");
     await hostBadgeToggle.click();
@@ -563,10 +563,10 @@ test("multiple-video ranking and SPA replacement remain controllable", async () 
       "The main video is selected. Choose another if needed.",
     );
     await profile.fixture.bringToFront();
-    await profile.fixture.locator("[data-two-person-video-sync='badge'] .badge-toggle").click();
-    await expect(
-      profile.fixture.locator("[data-two-person-video-sync='badge'] .expanded-detail"),
-    ).toHaveText("Multiple videos detected. The main video is selected. Choose another if needed.");
+    await profile.fixture.locator("[data-vyzync='badge'] .badge-toggle").click();
+    await expect(profile.fixture.locator("[data-vyzync='badge'] .expanded-detail")).toHaveText(
+      "Multiple videos detected. The main video is selected. Choose another if needed.",
+    );
     await expect(profile.popup.locator("#picker-toggle")).toBeVisible();
     await profile.popup.locator("#picker-toggle").click();
     await expect(profile.popup.locator("#video-picker button")).toHaveCount(2);
@@ -603,16 +603,16 @@ test("unsupported players show a plain compatibility notice", async () => {
     await expect(profile.popup.locator("#status-message")).toHaveText("Try another video or site.");
     await expect(profile.popup.locator("#error-message")).toBeHidden();
     await profile.fixture.bringToFront();
-    await expect(profile.fixture.locator("[data-two-person-video-sync='badge'] .title")).toHaveText(
+    await expect(profile.fixture.locator("[data-vyzync='badge'] .title")).toHaveText(
       "Unsupported player",
     );
-    await profile.fixture.locator("[data-two-person-video-sync='badge'] .badge-toggle").click();
-    await expect(
-      profile.fixture.locator("[data-two-person-video-sync='badge'] .expanded-title"),
-    ).toHaveText("This player isn’t supported");
-    await expect(
-      profile.fixture.locator("[data-two-person-video-sync='badge'] .expanded-detail"),
-    ).toHaveText("Try another video or site.");
+    await profile.fixture.locator("[data-vyzync='badge'] .badge-toggle").click();
+    await expect(profile.fixture.locator("[data-vyzync='badge'] .expanded-title")).toHaveText(
+      "This player isn’t supported",
+    );
+    await expect(profile.fixture.locator("[data-vyzync='badge'] .expanded-detail")).toHaveText(
+      "Try another video or site.",
+    );
   } finally {
     await closeProfile(profile);
   }

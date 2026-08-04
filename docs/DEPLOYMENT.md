@@ -2,7 +2,7 @@
 
 The released extension uses its bundled secure relay. These instructions are for maintainers who want to operate a separate instance and build the extension for it.
 
-The public relay bundled with version 0.2.1 is
+The public relay used by Vyzync is
 `wss://two-person-video-sync-jubjub-cpu.onrender.com/ws`. Its health endpoint is
 `https://two-person-video-sync-jubjub-cpu.onrender.com/health`.
 
@@ -21,7 +21,7 @@ Set the secure relay address before creating production browser packages:
 
 ```powershell
 $env:WXT_SYNC_SERVER_URL = "wss://YOUR-SERVICE.example/ws"
-pnpm --filter @watch-sync/extension package:all
+pnpm --filter @vyzync/extension package:all
 ```
 
 The address is built into the extension. End users do not enter it in Settings.
@@ -32,8 +32,8 @@ The address is built into the extension. End users do not enter it in Settings.
 corepack enable
 corepack prepare pnpm@11.9.0 --activate
 pnpm install --frozen-lockfile
-pnpm --filter @watch-sync/server build
-pnpm --filter @watch-sync/server start
+pnpm --filter @vyzync/server build
+pnpm --filter @vyzync/server start
 ```
 
 Development and test builds use `ws://127.0.0.1:8787/ws` by default.
@@ -41,13 +41,13 @@ Development and test builds use `ws://127.0.0.1:8787/ws` by default.
 ## Run with Docker
 
 ```powershell
-docker build --file apps/server/Dockerfile --tag two-person-video-sync-server:0.2.1 .
+docker build --file apps/server/Dockerfile --tag vyzync-server:0.3.0 .
 docker run --rm `
-  --name two-person-video-sync-server `
+  --name vyzync-server `
   --publish 8787:8787 `
   --env HOST=0.0.0.0 `
   --env PORT=8787 `
-  two-person-video-sync-server:0.2.1
+  vyzync-server:0.3.0
 ```
 
 Public deployments must terminate TLS, set `TRUST_PROXY=true`, use `wss://`, keep one service instance, and keep room credentials out of URLs and logs.

@@ -1,8 +1,8 @@
 # Privacy Notice
 
-Last updated: July 31, 2026
+Last updated: August 3, 2026
 
-Two Person Video Sync coordinates playback state between exactly two people. It does not
+Vyzync coordinates playback state between exactly two people. It does not
 capture, download, decrypt, proxy, rebroadcast, or share audio or video. Each participant
 loads the video independently through their own legitimate website account, subscription,
 device, region, and network connection.

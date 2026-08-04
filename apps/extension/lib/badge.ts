@@ -1,7 +1,7 @@
 import type { RoomView, SyncStatus, ThemeMode } from "./types";
 
 const labels: Record<SyncStatus, string> = {
-  disabled: "Video Sync off",
+  disabled: "Vyzync off",
   "no-video": "This player isn’t supported",
   ready: "Ready to sync",
   waiting: "Waiting for the other person",
@@ -152,7 +152,7 @@ export class StatusBadge {
     private readonly actions: StatusBadgeActions = {},
   ) {
     this.host = document.createElement("div");
-    this.host.dataset.twoPersonVideoSync = "badge";
+    this.host.dataset.vyzync = "badge";
     this.host.style.cssText =
       "all:initial;position:fixed;right:16px;bottom:16px;z-index:2147483646;";
     this.setThemeMode(themeMode);
@@ -473,16 +473,16 @@ export class StatusBadge {
 
     this.menu = document.createElement("section");
     this.menu.className = "menu";
-    this.menu.id = "two-person-video-sync-menu";
+    this.menu.id = "vyzync-menu";
     this.menu.hidden = true;
     this.menu.setAttribute("role", "dialog");
-    this.menu.setAttribute("aria-label", "Video Sync room controls");
+    this.menu.setAttribute("aria-label", "Vyzync room controls");
 
     const hideButton = document.createElement("button");
     hideButton.type = "button";
     hideButton.className = "icon-button hide-button";
-    hideButton.title = "Hide Video Sync badge";
-    hideButton.setAttribute("aria-label", "Hide Video Sync badge");
+    hideButton.title = "Hide Vyzync badge";
+    hideButton.setAttribute("aria-label", "Hide Vyzync badge");
     hideButton.append(icon(this.icons.close));
     hideButton.addEventListener("click", () => this.hide());
     const currentStatus = document.createElement("div");
@@ -559,7 +559,7 @@ export class StatusBadge {
     this.badge.dataset.status = this.status;
     this.badge.setAttribute("aria-expanded", "false");
     this.badge.setAttribute("aria-controls", this.menu.id);
-    this.badge.setAttribute("aria-label", "Open Video Sync room controls. Ready to sync.");
+    this.badge.setAttribute("aria-label", "Open Vyzync room controls. Ready to sync.");
     const badgeDot = document.createElement("span");
     badgeDot.className = "dot";
     badgeDot.setAttribute("aria-hidden", "true");
@@ -603,7 +603,7 @@ export class StatusBadge {
     this.expandedDetail.hidden = !detail;
     this.badge.setAttribute(
       "aria-label",
-      `${this.expanded ? "Close" : "Open"} Video Sync room controls. ${labels[status]}.`,
+      `${this.expanded ? "Close" : "Open"} Vyzync room controls. ${labels[status]}.`,
     );
     this.liveRegion.textContent = `${labels[status]}${detail ? `. ${detail}` : ""}`;
     this.refreshRoomDetails();
@@ -632,7 +632,7 @@ export class StatusBadge {
     this.badge.setAttribute("aria-expanded", String(expanded));
     this.badge.setAttribute(
       "aria-label",
-      `${expanded ? "Close" : "Open"} Video Sync room controls. ${labels[this.status]}.`,
+      `${expanded ? "Close" : "Open"} Vyzync room controls. ${labels[this.status]}.`,
     );
   }
 

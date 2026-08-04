@@ -32,14 +32,14 @@ async function settleAction(): Promise<void> {
 
 describe("in-page status badge", () => {
   afterEach(() => {
-    document.querySelectorAll("[data-two-person-video-sync='badge']").forEach((element) => {
+    document.querySelectorAll("[data-vyzync='badge']").forEach((element) => {
       element.remove();
     });
   });
 
   it("stays compact by default and expands with live room details", () => {
     const badge = new StatusBadge("dark", icons);
-    const host = document.querySelector<HTMLElement>("[data-two-person-video-sync='badge']");
+    const host = document.querySelector<HTMLElement>("[data-vyzync='badge']");
     const shadow = host?.shadowRoot;
     const toggle = shadow?.querySelector<HTMLButtonElement>(".badge-toggle");
     const menu = shadow?.querySelector<HTMLElement>(".menu");
@@ -55,7 +55,7 @@ describe("in-page status badge", () => {
 
     expect(toggle?.getAttribute("aria-expanded")).toBe("true");
     expect(menu?.hidden).toBe(false);
-    expect(menu?.textContent).not.toContain("Video Sync");
+    expect(menu?.textContent).not.toContain("Vyzync");
     expect(menu?.textContent).not.toContain("Room controls");
     expect(shadow?.querySelector(".expanded-detail")?.textContent).toBe(
       "Playback is synchronized.",
@@ -81,9 +81,7 @@ describe("in-page status badge", () => {
     });
     badge.update("connected", "Connected to friend.", connectedRoom);
 
-    const shadow = document.querySelector<HTMLElement>(
-      "[data-two-person-video-sync='badge']",
-    )?.shadowRoot;
+    const shadow = document.querySelector<HTMLElement>("[data-vyzync='badge']")?.shadowRoot;
     shadow?.querySelector<HTMLButtonElement>(".badge-toggle")?.click();
 
     shadow?.querySelector<HTMLButtonElement>("[data-action='copy']")?.click();
@@ -102,7 +100,7 @@ describe("in-page status badge", () => {
 
   it("can be dismissed without removing the controller", () => {
     new StatusBadge("light", icons);
-    const host = document.querySelector<HTMLElement>("[data-two-person-video-sync='badge']");
+    const host = document.querySelector<HTMLElement>("[data-vyzync='badge']");
     const shadow = host?.shadowRoot;
 
     shadow?.querySelector<HTMLButtonElement>(".badge-toggle")?.click();

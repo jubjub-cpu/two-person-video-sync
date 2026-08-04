@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createCommandId, createParticipantId, type RandomSource } from "@watch-sync/protocol";
+import { createCommandId, createParticipantId, type RandomSource } from "@vyzync/protocol";
 
 import {
   CommandOrderer,

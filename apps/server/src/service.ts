@@ -14,7 +14,7 @@ import {
   createSessionId,
   decodeClientMessage,
   inspectProtocolVersion,
-} from "@watch-sync/protocol";
+} from "@vyzync/protocol";
 import type {
   ClientMessage,
   ErrorServerMessage,
@@ -28,7 +28,7 @@ import type {
   RoomId,
   ServerMessage,
   SessionId,
-} from "@watch-sync/protocol";
+} from "@vyzync/protocol";
 
 import type { ServerConfig } from "./config.js";
 import { FixedWindowRateLimiter } from "./rate-limit.js";

@@ -1,6 +1,6 @@
 {
-  "name": "@watch-sync/sync-core",
-  "version": "0.2.2",
+  "name": "@vyzync/sync-core",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "sideEffects": false,
@@ -21,7 +21,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@watch-sync/protocol": "workspace:*"
+    "@vyzync/protocol": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.8.3",

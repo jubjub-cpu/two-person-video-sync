@@ -48,10 +48,10 @@ importers:
 
   apps/extension:
     dependencies:
-      '@watch-sync/protocol':
+      '@vyzync/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
-      '@watch-sync/sync-core':
+      '@vyzync/sync-core':
         specifier: workspace:*
         version: link:../../packages/sync-core
       zod:
@@ -79,7 +79,7 @@ importers:
       '@fastify/websocket':
         specifier: ^11.2.0
         version: 11.3.0
-      '@watch-sync/protocol':
+      '@vyzync/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
       fastify:
@@ -120,7 +120,7 @@ importers:
 
   packages/sync-core:
     dependencies:
-      '@watch-sync/protocol':
+      '@vyzync/protocol':
         specifier: workspace:*
         version: link:../protocol
     devDependencies:

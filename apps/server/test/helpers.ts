@@ -1,6 +1,6 @@
 import type { AddressInfo } from "node:net";
 
-import { PROTOCOL_VERSION, createRequestId, decodeServerMessage } from "@watch-sync/protocol";
+import { PROTOCOL_VERSION, createRequestId, decodeServerMessage } from "@vyzync/protocol";
 import type {
   ClientMessage,
   ControlMode,
@@ -8,7 +8,7 @@ import type {
   RoomJoinedServerMessage,
   ServerMessage,
   VideoState,
-} from "@watch-sync/protocol";
+} from "@vyzync/protocol";
 import WebSocket from "ws";
 
 import { loadConfig } from "../src/config.js";

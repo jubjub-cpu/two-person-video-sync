@@ -1,10 +1,5 @@
-import {
-  PROTOCOL_VERSION,
-  createCommandId,
-  createPingId,
-  createSessionId,
-} from "@watch-sync/protocol";
-import type { ClientMessage, PlaybackCommand } from "@watch-sync/protocol";
+import { PROTOCOL_VERSION, createCommandId, createPingId, createSessionId } from "@vyzync/protocol";
+import type { ClientMessage, PlaybackCommand } from "@vyzync/protocol";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -53,7 +48,7 @@ afterEach(async () => {
   }
 });
 
-describe("watch sync WebSocket service", () => {
+describe("Vyzync WebSocket service", () => {
   it("reports health, creates a room, joins it, and rejects a third participant", async () => {
     const server = await harness();
     const host = await TestClient.connect(server.wsUrl);

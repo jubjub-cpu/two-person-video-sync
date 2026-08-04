@@ -1,4 +1,4 @@
-import type { PlaybackCommand } from "@watch-sync/protocol";
+import type { PlaybackCommand } from "@vyzync/protocol";
 
 export type MediaEventKind = "play" | "pause" | "seeking" | "seeked" | "ratechange";
 

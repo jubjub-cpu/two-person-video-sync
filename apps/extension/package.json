@@ -1,12 +1,11 @@
 {
-  "name": "@watch-sync/extension",
-  "version": "0.2.2",
+  "name": "@vyzync/extension",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "wxt",
     "dev:firefox": "wxt -b firefox --mv3",
-    "prepare": "wxt prepare",
     "build": "pnpm build:chrome && pnpm build:firefox",
     "build:chrome": "wxt build -b chrome --mv3",
     "build:chrome:test": "wxt build -b chrome --mv3 --mode testing",
@@ -19,8 +18,8 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@watch-sync/protocol": "workspace:*",
-    "@watch-sync/sync-core": "workspace:*",
+    "@vyzync/protocol": "workspace:*",
+    "@vyzync/sync-core": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {
