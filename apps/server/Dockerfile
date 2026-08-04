@@ -1,5 +1,5 @@
 # Build from the monorepo root:
-#   docker build -f apps/server/Dockerfile -t watch-sync-server .
+#   docker build -f apps/server/Dockerfile -t vyzync-server .
 FROM node:24.18.0-alpine3.23 AS build
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
@@ -9,20 +9,20 @@ WORKDIR /workspace
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json .npmrc ./
 COPY packages/protocol/package.json packages/protocol/package.json
 COPY apps/server/package.json apps/server/package.json
-RUN pnpm install --frozen-lockfile --filter @watch-sync/server...
+RUN pnpm install --frozen-lockfile --filter @vyzync/server...
 
 COPY packages/protocol packages/protocol
 COPY apps/server apps/server
-RUN pnpm --filter @watch-sync/protocol build \
-    && pnpm --filter @watch-sync/server build \
-    && pnpm --filter @watch-sync/server deploy --prod --legacy /opt/watch-sync
+RUN pnpm --filter @vyzync/protocol build \
+    && pnpm --filter @vyzync/server build \
+    && pnpm --filter @vyzync/server deploy --prod --legacy /opt/vyzync
 
 FROM node:24.18.0-alpine3.23 AS runtime
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=8787
 WORKDIR /app
-COPY --from=build --chown=node:node /opt/watch-sync/ ./
+COPY --from=build --chown=node:node /opt/vyzync/ ./
 USER node
 EXPOSE 8787
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \

@@ -2,16 +2,15 @@
 
 ## Supported release
 
-The current release is `0.2.x`. Release builds use the hosted synchronization relay. The
-prepared browser packages have not yet been published to an extension store.
+The current release line is `0.3.x`. Release builds use the hosted synchronization relay.
+Public browser builds are distributed only through the official store links in `README.md`.
+GitHub ZIP files are source or reviewer packages, not signed browser-store installers.
 
 ## Reporting a vulnerability
 
 Do not open a public issue containing an active room code, reconnection credential, private
-URL, exploit details, or personal information. Until this project has an official repository
-and private security-reporting address, report privately to the person or organization that
-distributed your build. A future public repository should enable private security advisories
-before accepting outside reports.
+URL, exploit details, or personal information. Until a private security-reporting address is
+listed, report privately to the person or organization that distributed your build.
 
 Include the affected version, browser and server versions, impact, minimal reproduction, and
 whether any credential may have been exposed. Never include a real streaming-service

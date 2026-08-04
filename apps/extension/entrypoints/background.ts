@@ -17,8 +17,8 @@ import {
   type SessionId,
   type VideoIdentity,
   type VideoState,
-} from "@watch-sync/protocol";
-import { ClockEstimator } from "@watch-sync/sync-core";
+} from "@vyzync/protocol";
+import { ClockEstimator } from "@vyzync/sync-core";
 import { browser } from "wxt/browser";
 
 import { failure, success } from "../lib/bridge";

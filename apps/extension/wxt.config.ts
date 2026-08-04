@@ -10,15 +10,16 @@ interface GeneratedManifest {
 export default defineConfig({
   manifestVersion: 3,
   manifest: ({ browser }) => ({
-    name: "Two Person Video Sync",
-    short_name: "Video Sync",
-    description: "Keep playback state synchronized for exactly two viewers. Media is never shared.",
-    version: "0.2.2",
+    name: "Vyzync",
+    short_name: "Vyzync",
+    description:
+      "Watch video together with one friend. Keep play, pause, seeking, and speed in sync.",
+    version: "0.3.0",
     ...(browser === "chrome" ? { minimum_chrome_version: "116" } : {}),
     permissions: ["activeTab", "clipboardWrite", "scripting", "storage"],
     optional_host_permissions: OPTIONAL_HOSTS,
     action: {
-      default_title: "Two Person Video Sync",
+      default_title: "Vyzync",
     },
     icons: {
       16: "icons/icon-16.png",
@@ -31,7 +32,7 @@ export default defineConfig({
       browser === "firefox"
         ? {
             gecko: {
-              id: "two-person-video-sync@local.invalid",
+              id: "vyzync@jubjub-cpu.github.io",
               strict_min_version: "140.0",
               data_collection_permissions: {
                 required: ["browsingActivity", "websiteContent", "websiteActivity"],

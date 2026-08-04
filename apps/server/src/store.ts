@@ -9,7 +9,7 @@ import type {
   RoomId,
   SessionId,
   VideoState,
-} from "@watch-sync/protocol";
+} from "@vyzync/protocol";
 
 export interface ParticipantRecord {
   participantId: ParticipantId;

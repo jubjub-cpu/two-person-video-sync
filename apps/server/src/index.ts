@@ -71,7 +71,7 @@ async function main(): Promise<void> {
       port: config.port,
       environment: config.environment,
     },
-    "Watch Sync server is ready",
+    "Vyzync synchronization service is ready",
   );
 }
 

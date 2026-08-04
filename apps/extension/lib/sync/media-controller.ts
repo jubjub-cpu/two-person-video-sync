@@ -1,5 +1,5 @@
 import { browser } from "wxt/browser";
-import { DriftController } from "@watch-sync/sync-core";
+import { DriftController } from "@vyzync/sync-core";
 
 import { isRuntimeResponse, makeRequestId, sendRuntimeRequest } from "../bridge";
 import { compatibilityNoticeFor } from "../compatibility-notice";

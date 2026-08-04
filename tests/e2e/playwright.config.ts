@@ -18,7 +18,7 @@ export default defineConfig({
   outputDir: "test-results",
   webServer: [
     {
-      command: "pnpm --filter @watch-sync/server dev",
+      command: "pnpm --filter @vyzync/server dev",
       cwd: repositoryRoot,
       url: "http://127.0.0.1:8787/health",
       timeout: 30_000,

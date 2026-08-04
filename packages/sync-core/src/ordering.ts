@@ -1,4 +1,4 @@
-import type { CommandId, ParticipantId } from "@watch-sync/protocol";
+import type { CommandId, ParticipantId } from "@vyzync/protocol";
 
 export interface CommandCandidate<Command> {
   readonly commandId: CommandId;
