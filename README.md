@@ -10,14 +10,14 @@ Download the files from the [latest release](https://github.com/jubjub-cpu/two-p
 
 ### Chrome
 
-1. Download `video-sync-chrome-0.2.1.zip`.
+1. Download `video-sync-chrome-0.2.2.zip`.
 2. Extract the ZIP.
 3. Open `chrome://extensions` and turn on **Developer mode**.
 4. Select **Load unpacked** and choose the extracted folder.
 
 ### Firefox
 
-1. Download `video-sync-firefox-unsigned-0.2.1.zip`.
+1. Download `video-sync-firefox-unsigned-0.2.2.zip`.
 2. Extract the ZIP.
 3. Open `about:debugging#/runtime/this-firefox`.
 4. Select **Load Temporary Add-on** and choose `manifest.json` from the extracted folder.
@@ -29,6 +29,7 @@ Firefox removes temporary add-ons when the browser closes. Permanent browser ins
 1. Both people open the same video and select **Enable on this site** once.
 2. The host selects **Create private room**. The room code is copied automatically.
 3. The other person pastes the code into **Join a room** and presses Enter.
+4. To change videos, both people open the same next video. The room stays connected and automatically follows the active video tab.
 
 The synchronization service is already included in the extension. No server address or connection setup is required. The first room after the free service has been idle can take up to a minute to start.
 

@@ -166,6 +166,18 @@ async function mediaState(page: Page): Promise<{
   });
 }
 
+async function openVideoTab(profile: Profile, pathname: string): Promise<Page> {
+  const page = await profile.context.newPage();
+  await page.goto(`http://127.0.0.1:4173/${pathname}`);
+  await page.bringToFront();
+  await expect
+    .poll(() =>
+      page.locator("#main-video").evaluate((element) => (element as HTMLVideoElement).readyState),
+    )
+    .toBeGreaterThanOrEqual(2);
+  return page;
+}
+
 test("two isolated extension profiles create, join, synchronize, recover, and avoid echoes", async () => {
   const host = await launchProfile("host");
   const guest = await launchProfile("guest");
@@ -433,15 +445,142 @@ test("two isolated extension profiles create, join, synchronize, recover, and av
   }
 });
 
+test("one room follows both participants to matching videos in separate tabs", async () => {
+  const host = await launchProfile("tab-handoff-host");
+  const guest = await launchProfile("tab-handoff-guest");
+  try {
+    await host.popup.locator("#create-room").click();
+    await expect(host.popup.locator("#room-code-display")).toHaveText(/^[2-9A-HJ-NP-Z]{16}$/);
+    const roomCode = (await host.popup.locator("#room-code-display").textContent())!.trim();
+    await guest.popup.locator("#room-code").fill(roomCode);
+    await guest.popup.locator("#join-form button[type='submit']").click();
+    await expect(host.popup.locator("#participant-count")).toHaveText("2 of 2");
+    await expect(guest.popup.locator("#participant-count")).toHaveText("2 of 2");
+
+    const hostNext = await openVideoTab(host, "spa.html");
+    const guestNext = await openVideoTab(guest, "spa.html");
+
+    await expect(host.popup.locator("#room-code-display")).toHaveText(roomCode);
+    await expect(guest.popup.locator("#room-code-display")).toHaveText(roomCode);
+    await expect(host.popup.locator("#participant-count")).toHaveText("2 of 2");
+    await expect(guest.popup.locator("#participant-count")).toHaveText("2 of 2");
+
+    await hostNext.locator("#main-video").evaluate((element) => {
+      const video = element as HTMLVideoElement;
+      video.pause();
+      video.currentTime = 2.25;
+    });
+    await expect
+      .poll(async () => Math.abs((await mediaState(guestNext)).currentTime - 2.25), {
+        timeout: 10_000,
+      })
+      .toBeLessThan(0.25);
+
+    await hostNext.locator("#main-video").evaluate(async (element) => {
+      await (element as HTMLVideoElement).play();
+    });
+    await expect.poll(async () => (await mediaState(guestNext)).paused).toBe(false);
+    await hostNext.locator("#main-video").evaluate((element) => {
+      (element as HTMLVideoElement).pause();
+    });
+    await expect.poll(async () => (await mediaState(guestNext)).paused).toBe(true);
+
+    const settledPosition = (await mediaState(guestNext)).currentTime;
+    await host.fixture.locator("#main-video").evaluate((element) => {
+      const oldVideo = element as HTMLVideoElement;
+      oldVideo.currentTime = 0.15;
+      void oldVideo.play();
+    });
+    await guestNext.waitForTimeout(900);
+    const afterInactiveTabAction = await mediaState(guestNext);
+    expect(afterInactiveTabAction.paused).toBe(true);
+    expect(Math.abs(afterInactiveTabAction.currentTime - settledPosition)).toBeLessThan(0.25);
+
+    await Promise.all([host.fixture.close(), guest.fixture.close()]);
+    await expect(host.popup.locator("#room-code-display")).toHaveText(roomCode);
+    await expect(guest.popup.locator("#room-code-display")).toHaveText(roomCode);
+    await expect(host.popup.locator("#participant-count")).toHaveText("2 of 2");
+    await expect(guest.popup.locator("#participant-count")).toHaveText("2 of 2");
+
+    await hostNext.locator("#main-video").evaluate((element) => {
+      (element as HTMLVideoElement).currentTime = 3.1;
+    });
+    await expect
+      .poll(async () => Math.abs((await mediaState(guestNext)).currentTime - 3.1))
+      .toBeLessThan(0.25);
+
+    const hostConnectionTelemetry = await host.worker.evaluate(() => {
+      const scope = globalThis as unknown as {
+        __watchSyncSockets?: WebSocket[];
+        __watchSyncTelemetry?: { outbound: string[] };
+      };
+      return {
+        openSockets:
+          scope.__watchSyncSockets?.filter((socket) => socket.readyState === WebSocket.OPEN)
+            .length ?? 0,
+        creates:
+          scope.__watchSyncTelemetry?.outbound.filter((type) => type === "room.create").length ?? 0,
+        reconnects:
+          scope.__watchSyncTelemetry?.outbound.filter((type) => type === "room.reconnect").length ??
+          0,
+      };
+    });
+    const guestConnectionTelemetry = await guest.worker.evaluate(() => {
+      const scope = globalThis as unknown as {
+        __watchSyncSockets?: WebSocket[];
+        __watchSyncTelemetry?: { outbound: string[] };
+      };
+      return {
+        openSockets:
+          scope.__watchSyncSockets?.filter((socket) => socket.readyState === WebSocket.OPEN)
+            .length ?? 0,
+        joins:
+          scope.__watchSyncTelemetry?.outbound.filter((type) => type === "room.join").length ?? 0,
+        reconnects:
+          scope.__watchSyncTelemetry?.outbound.filter((type) => type === "room.reconnect").length ??
+          0,
+      };
+    });
+    expect(hostConnectionTelemetry.openSockets).toBe(1);
+    expect(hostConnectionTelemetry.creates).toBe(1);
+    expect(hostConnectionTelemetry.reconnects).toBeLessThanOrEqual(1);
+    expect(guestConnectionTelemetry.openSockets).toBe(1);
+    expect(guestConnectionTelemetry.joins).toBe(1);
+    expect(guestConnectionTelemetry.reconnects).toBeLessThanOrEqual(1);
+
+    await host.popup.locator("#end-room").click();
+    await expect(guest.popup.locator("#status-title")).toHaveText("Sync service unavailable");
+  } finally {
+    await Promise.all([closeProfile(host), closeProfile(guest)]);
+  }
+});
+
 test("multiple-video ranking and SPA replacement remain controllable", async () => {
   const profile = await launchProfile("edge-cases", "multi.html");
   try {
-    await expect(profile.popup.locator("#status-title")).toHaveText("Ready to sync");
+    await expect(profile.popup.locator("#status-title")).toHaveText("Multiple videos detected");
+    await expect(profile.popup.locator("#status-message")).toHaveText(
+      "The main video is selected. Choose another if needed.",
+    );
+    await profile.fixture.bringToFront();
+    await profile.fixture.locator("[data-two-person-video-sync='badge'] .badge-toggle").click();
+    await expect(
+      profile.fixture.locator("[data-two-person-video-sync='badge'] .expanded-detail"),
+    ).toHaveText("Multiple videos detected. The main video is selected. Choose another if needed.");
     await expect(profile.popup.locator("#picker-toggle")).toBeVisible();
     await profile.popup.locator("#picker-toggle").click();
     await expect(profile.popup.locator("#video-picker button")).toHaveCount(2);
     await expect(profile.popup.locator("#video-picker button[aria-pressed='true']")).toContainText(
       "Main full-size flower video",
+    );
+    await profile.popup.locator("#create-room").click();
+    await expect(profile.popup.locator("#room-panel")).toBeVisible();
+    await expect(profile.popup.locator("#compatibility-notice")).toBeVisible();
+    await expect(profile.popup.locator("#compatibility-title")).toHaveText(
+      "Multiple videos detected",
+    );
+    await expect(profile.popup.locator("#compatibility-message")).toHaveText(
+      "The main video is selected. Choose another if needed.",
     );
 
     await profile.fixture.goto("http://127.0.0.1:4173/spa.html");
@@ -452,6 +591,28 @@ test("multiple-video ranking and SPA replacement remain controllable", async () 
       "SPA Video Replacement Fixture",
       { timeout: 8_000 },
     );
+  } finally {
+    await closeProfile(profile);
+  }
+});
+
+test("unsupported players show a plain compatibility notice", async () => {
+  const profile = await launchProfile("unsupported-player", "unsupported.html");
+  try {
+    await expect(profile.popup.locator("#status-title")).toHaveText("This player isn’t supported");
+    await expect(profile.popup.locator("#status-message")).toHaveText("Try another video or site.");
+    await expect(profile.popup.locator("#error-message")).toBeHidden();
+    await profile.fixture.bringToFront();
+    await expect(profile.fixture.locator("[data-two-person-video-sync='badge'] .title")).toHaveText(
+      "Unsupported player",
+    );
+    await profile.fixture.locator("[data-two-person-video-sync='badge'] .badge-toggle").click();
+    await expect(
+      profile.fixture.locator("[data-two-person-video-sync='badge'] .expanded-title"),
+    ).toHaveText("This player isn’t supported");
+    await expect(
+      profile.fixture.locator("[data-two-person-video-sync='badge'] .expanded-detail"),
+    ).toHaveText("Try another video or site.");
   } finally {
     await closeProfile(profile);
   }

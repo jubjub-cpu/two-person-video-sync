@@ -27,6 +27,26 @@ async function harness(overrides: Parameters<typeof startHarness>[0] = {}): Prom
   return started;
 }
 
+async function expectUpgradeRejected(
+  server: TestHarness,
+  statusCode: number,
+  origin = TEST_ORIGIN,
+): Promise<void> {
+  await expect(TestClient.connect(server.wsUrl, origin)).rejects.toThrow();
+  const response = await server.built.app.inject({
+    method: "GET",
+    url: "/ws",
+    headers: {
+      connection: "upgrade",
+      origin,
+      "sec-websocket-key": "dGhlIHNhbXBsZSBub25jZQ==",
+      "sec-websocket-version": "13",
+      upgrade: "websocket",
+    },
+  });
+  expect(response.statusCode).toBe(statusCode);
+}
+
 afterEach(async () => {
   for (const current of harnesses.splice(0).reverse()) {
     await current.stop();
@@ -464,23 +484,17 @@ describe("watch sync WebSocket service", () => {
 
     const attempts = await harness({ rateLimits: { connectionAttempts: 1 } });
     await TestClient.connect(attempts.wsUrl);
-    await expect(TestClient.connect(attempts.wsUrl)).rejects.toThrow(
-      /Unexpected server response: 429/,
-    );
+    await expectUpgradeRejected(attempts, 429);
 
     const capacity = await harness({ maxConnections: 2, maxConnectionsPerIp: 2 });
     await TestClient.connect(capacity.wsUrl);
     await TestClient.connect(capacity.wsUrl);
-    await expect(TestClient.connect(capacity.wsUrl)).rejects.toThrow(
-      /Unexpected server response: 503/,
-    );
+    await expectUpgradeRejected(capacity, 503);
   });
 
   it("checks exact extension/local origins and requires WSS when configured", async () => {
     const origins = await harness();
-    await expect(TestClient.connect(origins.wsUrl, "https://attacker.invalid")).rejects.toThrow(
-      /Unexpected server response: 403/,
-    );
+    await expectUpgradeRejected(origins, 403, "https://attacker.invalid");
     const extension = await TestClient.connect(
       origins.wsUrl,
       "chrome-extension://abcdefghijklmnopabcdefghijklmnop",
@@ -488,9 +502,7 @@ describe("watch sync WebSocket service", () => {
     expect(extension.socket.readyState).toBe(1);
 
     const secure = await harness({ requireSecureWebSocket: true });
-    await expect(TestClient.connect(secure.wsUrl, TEST_ORIGIN)).rejects.toThrow(
-      /Unexpected server response: 426/,
-    );
+    await expectUpgradeRejected(secure, 426);
   });
 
   it("prevents session spoofing and permits only the host to end a room", async () => {

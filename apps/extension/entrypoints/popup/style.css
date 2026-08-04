@@ -226,11 +226,6 @@ legend {
   mask-image: url("/icons/ui/chevron-right.svg");
 }
 
-.icon-info {
-  -webkit-mask-image: url("/icons/ui/info-circle.svg");
-  mask-image: url("/icons/ui/info-circle.svg");
-}
-
 .status-card {
   align-items: flex-start;
   background: var(--success-surface);
@@ -280,7 +275,8 @@ legend {
 .status-card[data-state="correcting"],
 .status-card[data-state="peer-buffering"],
 .status-card[data-state="autoplay-blocked"],
-.status-card[data-state="reconnecting"] {
+.status-card[data-state="reconnecting"],
+.status-card[data-state="compatibility-warning"] {
   background: var(--warning-surface);
   color: var(--warning);
 }
@@ -288,9 +284,52 @@ legend {
 .status-card[data-state="mismatch"],
 .status-card[data-state="offline"],
 .status-card[data-state="no-video"],
-.status-card[data-state="disabled"] {
+.status-card[data-state="disabled"],
+.status-card[data-state="compatibility-negative"] {
   background: var(--negative-surface);
   color: var(--negative);
+}
+
+.compatibility-notice {
+  align-items: flex-start;
+  background: var(--warning-surface);
+  border-bottom: 1px solid var(--border);
+  color: var(--warning);
+  display: flex;
+  gap: 10px;
+  padding: 10px 16px;
+}
+
+.compatibility-notice[hidden] {
+  display: none;
+}
+
+.compatibility-notice[data-tone="negative"] {
+  background: var(--negative-surface);
+  color: var(--negative);
+}
+
+.compatibility-dot {
+  background: currentColor;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  height: 8px;
+  margin-top: 4px;
+  width: 8px;
+}
+
+.compatibility-notice strong {
+  color: var(--content-primary);
+  display: block;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.compatibility-notice p {
+  color: var(--content-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+  margin-top: 2px;
 }
 
 .panel,
@@ -770,28 +809,6 @@ input[role="switch"] {
 .settings-row .icon-chevron {
   height: 18px;
   width: 18px;
-}
-
-footer {
-  align-items: center;
-  color: var(--content-secondary);
-  display: flex;
-  font-size: 11px;
-  justify-content: space-between;
-  min-height: 44px;
-  padding: 10px 16px;
-}
-
-footer a {
-  align-items: center;
-  color: var(--content-primary);
-  display: inline-flex;
-  padding: 3px;
-}
-
-footer .ui-icon {
-  height: 20px;
-  width: 20px;
 }
 
 .visually-hidden {

@@ -2,6 +2,7 @@ import { browser } from "wxt/browser";
 import { DriftController } from "@watch-sync/sync-core";
 
 import { isRuntimeResponse, makeRequestId, sendRuntimeRequest } from "../bridge";
+import { compatibilityNoticeFor } from "../compatibility-notice";
 import { RuntimeEventSchema } from "../runtime-schema";
 import { compareVideoIdentities } from "../adapters/identity";
 import { createMediaAdapter, type MediaAdapter } from "../adapters/media-adapter";
@@ -223,6 +224,21 @@ export class MediaSessionController {
   private publishSnapshot(): void {
     const candidates = this.detector.summaries();
     this.lastSnapshot = this.adapter?.snapshot(this.buffering);
+    if (!this.roomActive) {
+      const notice = compatibilityNoticeFor({
+        enabled: true,
+        supportedPage: true,
+        ...(this.lastSnapshot ? { video: this.lastSnapshot } : {}),
+        candidates,
+      });
+      if (notice?.kind === "unsupported-player") {
+        this.updateBadge("no-video", notice.message);
+      } else if (notice) {
+        this.updateBadge("ready", `${notice.title}. ${notice.message}`);
+      } else {
+        this.updateBadge("ready");
+      }
+    }
     void this.send({
       type: "content/snapshot",
       requestId: makeRequestId(),
