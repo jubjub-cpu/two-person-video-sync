@@ -35,7 +35,7 @@ export interface RoomRecord {
   lastActivityAtMs: number;
   serverSequence: number;
   controlMode: ControlMode;
-  readonly hostParticipantId: ParticipantId;
+  hostParticipantId: ParticipantId;
   authoritativeParticipantId: ParticipantId;
   state: PlaybackState | undefined;
   readonly participants: Map<ParticipantId, ParticipantRecord>;

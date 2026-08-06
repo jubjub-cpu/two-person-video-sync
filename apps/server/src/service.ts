@@ -441,6 +441,7 @@ export class RoomService {
       case "participant.ready":
       case "participant.leave":
       case "room.end":
+      case "room.transfer-host":
       case "control.set":
       case "video.update":
       case "playback.status":
@@ -912,6 +913,57 @@ export class RoomService {
         }
         await this.#endRoom(room, "host-ended", participant.participantId);
         return;
+      case "room.transfer-host": {
+        if (participant.role !== "host") {
+          this.#sendError(
+            connection,
+            "NOT_AUTHORIZED",
+            "Only the host can pass host control",
+            false,
+            message.requestId,
+          );
+          return;
+        }
+        const nextHost = [...room.participants.values()].find(
+          (candidate) => candidate.participantId !== participant.participantId,
+        );
+        const nextHostConnection =
+          nextHost?.connectionId === undefined
+            ? undefined
+            : this.#connections.get(nextHost.connectionId);
+        if (
+          nextHost === undefined ||
+          nextHostConnection === undefined ||
+          nextHostConnection.closed ||
+          nextHostConnection.socket.readyState !== SOCKET_OPEN
+        ) {
+          this.#sendError(
+            connection,
+            "NOT_AUTHORIZED",
+            "The other participant must be connected before host control can be passed",
+            false,
+            message.requestId,
+          );
+          return;
+        }
+
+        const previousHostParticipantId = participant.participantId;
+        participant.role = "guest";
+        nextHost.role = "host";
+        room.hostParticipantId = nextHost.participantId;
+        room.authoritativeParticipantId = nextHost.participantId;
+        room.state = undefined;
+        room.serverSequence += 1;
+        this.#broadcast(room, {
+          ...this.#orderedEnvelope(room, now),
+          type: "room.host-transferred",
+          previousHostParticipantId,
+          hostParticipantId: nextHost.participantId,
+          participants: participantSummaries(room),
+        });
+        await this.store.save(room);
+        return;
+      }
       case "control.set":
         if (participant.role !== "host") {
           this.#sendError(

@@ -555,6 +555,84 @@ test("one room follows both participants to matching videos in separate tabs", a
   }
 });
 
+test("the host can pass leadership and the former host follows the new host across videos", async () => {
+  const originalHost = await launchProfile("transfer-original-host");
+  const originalGuest = await launchProfile("transfer-original-guest");
+  try {
+    await originalHost.popup.locator("#create-room").click();
+    await expect(originalHost.popup.locator("#room-code-display")).toHaveText(
+      /^[2-9A-HJ-NP-Z]{16}$/,
+    );
+    const roomCode = (await originalHost.popup.locator("#room-code-display").textContent())!.trim();
+    await originalGuest.popup.locator("#room-code").fill(roomCode);
+    await originalGuest.popup.locator("#join-form button[type='submit']").click();
+    await expect(originalHost.popup.locator("#participant-count")).toHaveText("2 of 2");
+    await expect(originalGuest.popup.locator("#participant-count")).toHaveText("2 of 2");
+
+    await expect(originalHost.popup.locator("#pass-host")).toBeVisible();
+    await expect(originalGuest.popup.locator("#pass-host")).toBeHidden();
+    await originalHost.popup.locator("#pass-host").click();
+
+    await expect(originalHost.popup.locator("#room-role")).toHaveText("You’re the guest");
+    await expect(originalGuest.popup.locator("#room-role")).toHaveText("You’re the host");
+    await expect(originalHost.popup.locator("#pass-host")).toBeHidden();
+    await expect(originalHost.popup.locator("#end-room")).toBeHidden();
+    await expect(originalGuest.popup.locator("#pass-host")).toBeVisible();
+    await expect(originalGuest.popup.locator("#end-room")).toBeVisible();
+    await expect(originalHost.popup.locator("#room-code-wrap")).toBeHidden();
+    await expect(originalGuest.popup.locator("#room-code-display")).toHaveText(roomCode);
+
+    const formerHostBadge = originalHost.fixture.locator("[data-vyzync='badge']");
+    const newHostBadge = originalGuest.fixture.locator("[data-vyzync='badge']");
+    await formerHostBadge.locator(".badge-toggle").click();
+    await newHostBadge.locator(".badge-toggle").click();
+    await expect(formerHostBadge.locator("[data-action='transfer']")).toBeHidden();
+    await expect(newHostBadge.locator("[data-action='transfer']")).toBeVisible();
+
+    const newHostVideo = await openVideoTab(originalGuest, "spa.html");
+    await expect(originalHost.popup.locator("#status-title")).toHaveText(
+      "Different videos detected",
+    );
+    await expect(originalHost.popup.locator("#status-message")).toHaveText(
+      "The videos don’t match. Open the host’s video to continue.",
+    );
+    await expect(originalGuest.popup.locator("#status-message")).toHaveText(
+      "Your friend is on a different video. Waiting for them to open yours.",
+    );
+
+    const formerHostVideo = await openVideoTab(originalHost, "spa.html");
+    await expect(originalHost.popup.locator("#room-code-display")).toHaveText(roomCode);
+    await expect(originalGuest.popup.locator("#room-code-display")).toHaveText(roomCode);
+    await expect(originalHost.popup.locator("#status-title")).not.toHaveText(
+      "Different videos detected",
+    );
+
+    await newHostVideo.locator("#main-video").evaluate((element) => {
+      const video = element as HTMLVideoElement;
+      video.pause();
+      video.currentTime = 2.8;
+    });
+    await expect
+      .poll(async () => Math.abs((await mediaState(formerHostVideo)).currentTime - 2.8), {
+        timeout: 10_000,
+      })
+      .toBeLessThan(0.25);
+
+    const transferTelemetry = await originalHost.worker.evaluate(
+      () =>
+        (
+          globalThis as unknown as {
+            __watchSyncTelemetry?: { outbound: string[] };
+          }
+        ).__watchSyncTelemetry?.outbound.filter((type) => type === "room.transfer-host").length ??
+        0,
+    );
+    expect(transferTelemetry).toBe(1);
+  } finally {
+    await Promise.all([closeProfile(originalHost), closeProfile(originalGuest)]);
+  }
+});
+
 test("multiple-video ranking and SPA replacement remain controllable", async () => {
   const profile = await launchProfile("edge-cases", "multi.html");
   try {

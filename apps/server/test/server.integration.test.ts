@@ -191,6 +191,87 @@ describe("Vyzync WebSocket service", () => {
     expect((await guest.nextType("error")).code).toBe("NOT_AUTHORIZED");
   });
 
+  it("transfers host authority to the connected guest and enforces the new roles", async () => {
+    const server = await harness();
+    const host = await TestClient.connect(server.wsUrl);
+    const guest = await TestClient.connect(server.wsUrl);
+    const created = await createRoom(host, server.clock);
+
+    host.send({
+      ...envelope(server.clock),
+      ...auth(created),
+      type: "room.transfer-host",
+    });
+    expect((await host.nextType("error")).message).toContain("must be connected");
+
+    const joined = await joinRoom(guest, server.clock, created.roomCode);
+    guest.send({
+      ...envelope(server.clock),
+      ...auth(joined),
+      type: "room.transfer-host",
+    });
+    expect((await guest.nextType("error")).code).toBe("NOT_AUTHORIZED");
+
+    host.send({
+      ...envelope(server.clock),
+      ...auth(created),
+      type: "room.transfer-host",
+    });
+    const hostTransfer = await host.nextType("room.host-transferred");
+    const guestTransfer = await guest.nextType("room.host-transferred");
+    expect(guestTransfer).toEqual(hostTransfer);
+    expect(hostTransfer).toMatchObject({
+      previousHostParticipantId: created.participantId,
+      hostParticipantId: joined.participantId,
+      participants: [
+        { participantId: joined.participantId, role: "host" },
+        { participantId: created.participantId, role: "guest" },
+      ],
+    });
+
+    const storedRoom = await server.built.service.store.getById(created.roomId);
+    expect(storedRoom?.hostParticipantId).toBe(joined.participantId);
+    expect(storedRoom?.authoritativeParticipantId).toBe(joined.participantId);
+    expect(storedRoom?.state).toBeUndefined();
+
+    host.send({
+      ...envelope(server.clock),
+      ...auth(created),
+      type: "command.submit",
+      commandId: createCommandId(),
+      clientSequence: 0,
+      action: { type: "play", positionSec: 15, playbackRate: 1 },
+    });
+    expect((await host.nextType("error")).code).toBe("NOT_AUTHORIZED");
+
+    guest.send({
+      ...envelope(server.clock),
+      ...auth(joined),
+      type: "command.submit",
+      commandId: createCommandId(),
+      clientSequence: 0,
+      action: { type: "play", positionSec: 15, playbackRate: 1 },
+    });
+    const accepted = await guest.nextType("command.accepted");
+    expect(accepted.originParticipantId).toBe(joined.participantId);
+    expect((await host.nextType("command.accepted")).serverSequence).toBe(accepted.serverSequence);
+
+    host.send({
+      ...envelope(server.clock),
+      ...auth(created),
+      type: "room.end",
+    });
+    expect((await host.nextType("error")).code).toBe("NOT_AUTHORIZED");
+
+    guest.send({
+      ...envelope(server.clock),
+      ...auth(joined),
+      type: "room.end",
+    });
+    expect((await guest.nextType("room.ended")).endedByParticipantId).toBe(joined.participantId);
+    expect((await host.nextType("room.ended")).reason).toBe("host-ended");
+  });
+
   it("broadcasts readiness, video, playback status, snapshots, and NTP-style pong timestamps", async () => {
     const server = await harness();
     const host = await TestClient.connect(server.wsUrl);

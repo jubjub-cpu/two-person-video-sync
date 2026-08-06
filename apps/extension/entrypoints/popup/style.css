@@ -762,6 +762,10 @@ input[role="switch"] {
   gap: 8px;
 }
 
+.transfer-button {
+  margin-bottom: 8px;
+}
+
 .button-row > * {
   flex: 1;
 }

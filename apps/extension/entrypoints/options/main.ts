@@ -7,6 +7,14 @@ import type { ThemeMode } from "../../lib/types";
 
 import "./style.css";
 
+const DONATION_URLS = [
+  [
+    "donate-bitcoin",
+    "bitcoin:3Ej3XVxtvkZqgrzeFt7AXfe5xtj67QnW87?label=Vyzync&message=Buy%20the%20dev%20a%20coffee",
+  ],
+  ["donate-ethereum", "ethereum:0x9B1110fAf0469474a681dba98826a0aeEc7A48B2@1"],
+] as const;
+
 const form = required<HTMLFormElement>("settings-form");
 const defaultMode = required<HTMLSelectElement>("default-mode");
 const showBadge = required<HTMLInputElement>("show-badge");
@@ -15,6 +23,9 @@ const themeLight = required<HTMLInputElement>("theme-light");
 const themeDark = required<HTMLInputElement>("theme-dark");
 const saveStatus = required<HTMLElement>("save-status");
 const permissionSummary = required<HTMLElement>("permission-summary");
+const supportControl = required<HTMLElement>("support-control");
+const supportDeveloper = required<HTMLButtonElement>("support-developer");
+const supportOptions = required<HTMLElement>("support-options");
 
 function required<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
@@ -59,6 +70,35 @@ form.addEventListener("submit", (event) => {
       saveStatus.textContent = "";
     }, 2_000);
   })();
+});
+
+function setSupportMenu(open: boolean): void {
+  supportOptions.hidden = !open;
+  supportDeveloper.setAttribute("aria-expanded", String(open));
+}
+
+supportDeveloper.disabled = false;
+supportDeveloper.addEventListener("click", () => {
+  setSupportMenu(supportOptions.hidden);
+});
+
+for (const [buttonId, url] of DONATION_URLS) {
+  required<HTMLButtonElement>(buttonId).addEventListener("click", () => {
+    setSupportMenu(false);
+    void browser.tabs.create({ url });
+  });
+}
+
+document.addEventListener("click", (event) => {
+  if (event.target instanceof Node && !supportControl.contains(event.target)) {
+    setSupportMenu(false);
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || supportOptions.hidden) return;
+  setSupportMenu(false);
+  supportDeveloper.focus();
 });
 
 for (const input of [themeSystem, themeLight, themeDark]) {

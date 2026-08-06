@@ -28,6 +28,7 @@ export default defineContentScript({
         copy: browser.runtime.getURL("/icons/ui/copy.svg"),
         leave: browser.runtime.getURL("/icons/ui/logout.svg"),
         reconnect: browser.runtime.getURL("/icons/ui/refresh.svg"),
+        transfer: browser.runtime.getURL("/icons/ui/users.svg"),
         userConnected: browser.runtime.getURL("/icons/ui/user-check.svg"),
         userDisconnected: browser.runtime.getURL("/icons/ui/user-x.svg"),
         wifi: browser.runtime.getURL("/icons/ui/wifi.svg"),

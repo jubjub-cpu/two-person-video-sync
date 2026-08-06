@@ -35,13 +35,19 @@ describe("extension runtime message schemas", () => {
     ).toThrow();
   });
 
-  it("accepts bounded in-page reconnect and leave actions", () => {
+  it("accepts bounded in-page reconnect, host-transfer, and leave actions", () => {
     expect(
       RuntimeRequestSchema.parse({
         type: "content/reconnect",
         requestId: "request-2",
       }),
     ).toMatchObject({ type: "content/reconnect" });
+    expect(
+      RuntimeRequestSchema.parse({
+        type: "content/transfer-host",
+        requestId: "request-transfer",
+      }),
+    ).toMatchObject({ type: "content/transfer-host" });
     expect(
       RuntimeRequestSchema.parse({
         type: "content/leave-room",

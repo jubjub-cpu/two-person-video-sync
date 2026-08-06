@@ -49,6 +49,7 @@ const elements = {
   openPeerVideo: required<HTMLButtonElement>("open-peer-video"),
   roomModeRow: required<HTMLElement>("room-mode-row"),
   roomMode: required<HTMLInputElement>("room-mode"),
+  passHost: required<HTMLButtonElement>("pass-host"),
   leaveRoom: required<HTMLButtonElement>("leave-room"),
   endRoom: required<HTMLButtonElement>("end-room"),
   error: required<HTMLElement>("error-message"),
@@ -134,6 +135,7 @@ function renderRoom(room: RoomView): void {
   elements.readyButton.hidden = room.status !== "autoplay-blocked";
   elements.roomMode.checked = room.controlMode === "shared";
   elements.roomModeRow.hidden = room.role !== "host";
+  elements.passHost.hidden = room.role !== "host" || room.participantCount !== 2;
   elements.endRoom.hidden = room.role !== "host";
   const peerUrl = canonicalUrl(room.peerVideo);
   elements.openPeerVideo.hidden = room.status !== "mismatch" || peerUrl === null;
@@ -307,6 +309,14 @@ elements.endRoom.addEventListener(
   () =>
     void withLoading(async () => {
       await sendRuntimeRequest({ type: "popup/leave-room", tabId: activeTabId!, endRoom: true });
+      await refresh();
+    }),
+);
+elements.passHost.addEventListener(
+  "click",
+  () =>
+    void withLoading(async () => {
+      await sendRuntimeRequest({ type: "popup/transfer-host", tabId: activeTabId! });
       await refresh();
     }),
 );

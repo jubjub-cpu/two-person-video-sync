@@ -153,6 +153,29 @@
 
         <div class="save-row">
           <button class="primary" type="submit">Save settings</button>
+          <div id="support-control" class="support-control">
+            <button
+              id="support-developer"
+              class="support-button"
+              type="button"
+              aria-haspopup="menu"
+              aria-expanded="false"
+              aria-controls="support-options"
+              disabled
+            >
+              Buy the dev a coffee
+            </button>
+            <div id="support-options" class="support-options" role="menu" hidden>
+              <button id="donate-bitcoin" class="support-option" type="button" role="menuitem">
+                <span>Bitcoin</span>
+                <small>BTC</small>
+              </button>
+              <button id="donate-ethereum" class="support-option" type="button" role="menuitem">
+                <span>Ethereum</span>
+                <small>ETH</small>
+              </button>
+            </div>
+          </div>
           <span id="save-status" role="status" aria-live="polite"></span>
         </div>
       </form>
