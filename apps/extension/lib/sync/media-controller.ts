@@ -94,6 +94,7 @@ export class MediaSessionController {
     this.badge ??= new StatusBadge(themeMode, this.options.badgeIcons, {
       onCopyRoomCode: (roomCode) => this.copyRoomCode(roomCode),
       onReconnect: () => this.reconnectRoom(),
+      onTransferHost: () => this.transferHost(),
       onLeaveRoom: (endRoom) => this.leaveRoom(endRoom),
     });
     this.badge.setThemeMode(themeMode);
@@ -591,6 +592,10 @@ export class MediaSessionController {
 
   private async reconnectRoom(): Promise<void> {
     await sendRuntimeRequest<RoomView>({ type: "content/reconnect" });
+  }
+
+  private async transferHost(): Promise<void> {
+    await sendRuntimeRequest<RoomView>({ type: "content/transfer-host" });
   }
 
   private async leaveRoom(endRoom: boolean): Promise<void> {

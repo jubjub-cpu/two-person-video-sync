@@ -135,6 +135,7 @@ export const RuntimeRequestSchema = z.discriminatedUnion("type", [
       endRoom: z.boolean(),
     })
     .strict(),
+  z.object({ type: z.literal("popup/transfer-host"), requestId, tabId }).strict(),
   z
     .object({
       type: z.literal("popup/set-control-mode"),
@@ -169,6 +170,7 @@ export const RuntimeRequestSchema = z.discriminatedUnion("type", [
     })
     .strict(),
   z.object({ type: z.literal("content/reconnect"), requestId }).strict(),
+  z.object({ type: z.literal("content/transfer-host"), requestId }).strict(),
   z
     .object({
       type: z.literal("content/leave-room"),

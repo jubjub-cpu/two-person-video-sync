@@ -113,6 +113,7 @@ export type RuntimeRequest =
   | { type: "popup/create-room"; requestId: string; tabId: number; controlMode: ControlMode }
   | { type: "popup/join-room"; requestId: string; tabId: number; roomCode: string }
   | { type: "popup/leave-room"; requestId: string; tabId: number; endRoom: boolean }
+  | { type: "popup/transfer-host"; requestId: string; tabId: number }
   | { type: "popup/set-control-mode"; requestId: string; tabId: number; mode: ControlMode }
   | { type: "popup/select-video"; requestId: string; tabId: number; candidateId: string }
   | { type: "popup/user-ready"; requestId: string; tabId: number }
@@ -125,6 +126,7 @@ export type RuntimeRequest =
     }
   | { type: "content/action"; requestId: string; action: LocalMediaAction }
   | { type: "content/reconnect"; requestId: string }
+  | { type: "content/transfer-host"; requestId: string }
   | { type: "content/leave-room"; requestId: string; endRoom: boolean }
   | {
       type: "content/mismatch";

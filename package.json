@@ -1,6 +1,6 @@
 {
   "name": "vyzync",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Vyzync browser extension and playback-state synchronization service.",
   "license": "MIT",

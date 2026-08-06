@@ -14,7 +14,7 @@ export default defineConfig({
     short_name: "Vyzync",
     description:
       "Watch video together with one friend. Keep play, pause, seeking, and speed in sync.",
-    version: "0.3.0",
+    version: "0.3.1",
     ...(browser === "chrome" ? { minimum_chrome_version: "116" } : {}),
     permissions: ["activeTab", "clipboardWrite", "scripting", "storage"],
     optional_host_permissions: OPTIONAL_HOSTS,

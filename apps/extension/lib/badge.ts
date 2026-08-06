@@ -38,6 +38,7 @@ export interface StatusBadgeIconUrls {
   copy: string;
   leave: string;
   reconnect: string;
+  transfer: string;
   userConnected: string;
   userDisconnected: string;
   wifi: string;
@@ -47,6 +48,7 @@ export interface StatusBadgeActions {
   onCopyRoomCode?: (roomCode: string) => Promise<void> | void;
   onLeaveRoom?: (endRoom: boolean) => Promise<void> | void;
   onReconnect?: () => Promise<void> | void;
+  onTransferHost?: () => Promise<void> | void;
 }
 
 interface SyncQuality {
@@ -93,7 +95,7 @@ function actionButton(
   iconUrl: string,
   label: string,
   description: string,
-  action: "copy" | "reconnect" | "leave",
+  action: "copy" | "reconnect" | "transfer" | "leave",
 ): HTMLButtonElement {
   const button = document.createElement("button");
   button.type = "button";
@@ -126,6 +128,7 @@ export class StatusBadge {
   private readonly roomCodeDetail: HTMLElement;
   private readonly copyButton: HTMLButtonElement;
   private readonly reconnectButton: HTMLButtonElement;
+  private readonly transferButton: HTMLButtonElement;
   private readonly leaveButton: HTMLButtonElement;
   private readonly feedback: HTMLParagraphElement;
   private readonly liveRegion: HTMLSpanElement;
@@ -133,7 +136,7 @@ export class StatusBadge {
   private room?: RoomView;
   private status: SyncStatus = "ready";
   private expanded = false;
-  private busyAction?: "copy" | "reconnect" | "leave";
+  private busyAction?: "copy" | "reconnect" | "transfer" | "leave";
   private feedbackTimer?: number;
 
   private readonly handleOutsidePointer = (event: PointerEvent): void => {
@@ -389,6 +392,7 @@ export class StatusBadge {
       }
 
       .menu-action:hover:not(:disabled) { background: var(--surface-hover); }
+      .menu-action[hidden] { display: none; }
       .menu-action:disabled { cursor: not-allowed; opacity: 0.42; }
       .menu-action .icon { height: 18px; width: 18px; }
       .action-copy { display: block; min-width: 0; }
@@ -534,6 +538,12 @@ export class StatusBadge {
       "Restart this room connection",
       "reconnect",
     );
+    this.transferButton = actionButton(
+      this.icons.transfer,
+      "Pass host",
+      "Make your friend the host",
+      "transfer",
+    );
     this.leaveButton = actionButton(
       this.icons.leave,
       "Leave room",
@@ -543,8 +553,9 @@ export class StatusBadge {
     this.roomCodeDetail = this.copyButton.querySelector<HTMLElement>(".action-detail")!;
     this.copyButton.addEventListener("click", () => void this.copyRoomCode());
     this.reconnectButton.addEventListener("click", () => void this.reconnect());
+    this.transferButton.addEventListener("click", () => void this.transferHost());
     this.leaveButton.addEventListener("click", () => void this.leaveRoom());
-    actionList.append(this.copyButton, this.reconnectButton, this.leaveButton);
+    actionList.append(this.copyButton, this.transferButton, this.reconnectButton, this.leaveButton);
 
     this.feedback = document.createElement("p");
     this.feedback.className = "feedback";
@@ -655,6 +666,10 @@ export class StatusBadge {
       !roomCode || !this.actions.onCopyRoomCode || Boolean(this.busyAction);
     this.reconnectButton.disabled =
       !activeRoom || !this.actions.onReconnect || Boolean(this.busyAction);
+    const canTransferHost = connected && this.room?.role === "host";
+    this.transferButton.hidden = !canTransferHost;
+    this.transferButton.disabled =
+      !canTransferHost || !this.actions.onTransferHost || Boolean(this.busyAction);
     this.leaveButton.disabled =
       !activeRoom || !this.actions.onLeaveRoom || Boolean(this.busyAction);
   }
@@ -670,6 +685,11 @@ export class StatusBadge {
     await this.runAction("reconnect", this.actions.onReconnect, "Reconnected.");
   }
 
+  private async transferHost(): Promise<void> {
+    if (!this.actions.onTransferHost) return;
+    await this.runAction("transfer", this.actions.onTransferHost, "Host passed.");
+  }
+
   private async leaveRoom(): Promise<void> {
     if (!this.actions.onLeaveRoom) return;
     const endRoom = this.room?.role === "host";
@@ -681,16 +701,20 @@ export class StatusBadge {
   }
 
   private async runAction(
-    action: "copy" | "reconnect" | "leave",
+    action: "copy" | "reconnect" | "transfer" | "leave",
     callback: () => Promise<void> | void,
     successMessage: string,
   ): Promise<void> {
     if (this.busyAction) return;
     this.busyAction = action;
     this.refreshRoomDetails();
-    this.showFeedback(
-      action === "copy" ? "Copying…" : action === "reconnect" ? "Reconnecting…" : "Leaving…",
-    );
+    const progress: Record<typeof action, string> = {
+      copy: "Copying…",
+      reconnect: "Reconnecting…",
+      transfer: "Passing host…",
+      leave: "Leaving…",
+    };
+    this.showFeedback(progress[action]);
     try {
       await callback();
       this.showFeedback(successMessage);

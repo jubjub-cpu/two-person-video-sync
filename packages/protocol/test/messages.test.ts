@@ -94,6 +94,7 @@ describe("client runtime message schemas", () => {
     },
     { ...authBase, type: "participant.leave", reason: "user" },
     { ...authBase, type: "room.end" },
+    { ...authBase, type: "room.transfer-host" },
     { ...authBase, type: "control.set", controlMode: "shared" },
     { ...authBase, type: "video.update", video },
     {
@@ -263,6 +264,16 @@ describe("server runtime message schemas", () => {
       type: "control.updated",
       controlMode: "shared",
       updatedByParticipantId: hostId,
+    },
+    {
+      ...orderedBase,
+      type: "room.host-transferred",
+      previousHostParticipantId: hostId,
+      hostParticipantId: guestId,
+      participants: [
+        { participantId: guestId, role: "host", ready: false, playbackStatus: "waiting" },
+        { participantId: hostId, role: "guest", ready: true, playbackStatus: "playing" },
+      ],
     },
     { ...orderedBase, type: "video.updated", participantId: hostId, video },
     {

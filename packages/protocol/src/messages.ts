@@ -161,6 +161,10 @@ export const RoomEndClientMessageSchema = AuthenticatedClientEnvelopeSchema.exte
   type: z.literal("room.end"),
 });
 
+export const RoomTransferHostClientMessageSchema = AuthenticatedClientEnvelopeSchema.extend({
+  type: z.literal("room.transfer-host"),
+});
+
 export const ControlSetClientMessageSchema = AuthenticatedClientEnvelopeSchema.extend({
   type: z.literal("control.set"),
   controlMode: ControlModeSchema,
@@ -211,6 +215,7 @@ export const ClientMessageSchema = z.discriminatedUnion("type", [
   ParticipantReadyClientMessageSchema,
   ParticipantLeaveClientMessageSchema,
   RoomEndClientMessageSchema,
+  RoomTransferHostClientMessageSchema,
   ControlSetClientMessageSchema,
   VideoUpdateClientMessageSchema,
   PlaybackStatusClientMessageSchema,
@@ -290,6 +295,13 @@ export const ControlUpdatedServerMessageSchema = OrderedServerEnvelopeSchema.ext
   type: z.literal("control.updated"),
   controlMode: ControlModeSchema,
   updatedByParticipantId: ParticipantIdSchema,
+});
+
+export const RoomHostTransferredServerMessageSchema = OrderedServerEnvelopeSchema.extend({
+  type: z.literal("room.host-transferred"),
+  previousHostParticipantId: ParticipantIdSchema,
+  hostParticipantId: ParticipantIdSchema,
+  participants: z.array(ParticipantSummarySchema).length(2),
 });
 
 export const VideoUpdatedServerMessageSchema = OrderedServerEnvelopeSchema.extend({
@@ -403,6 +415,7 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
   ParticipantReadyServerMessageSchema,
   ParticipantLeftServerMessageSchema,
   ControlUpdatedServerMessageSchema,
+  RoomHostTransferredServerMessageSchema,
   VideoUpdatedServerMessageSchema,
   PlaybackStatusServerMessageSchema,
   CommandAcceptedServerMessageSchema,
@@ -432,6 +445,7 @@ export type RoomReconnectClientMessage = z.infer<typeof RoomReconnectClientMessa
 export type ParticipantReadyClientMessage = z.infer<typeof ParticipantReadyClientMessageSchema>;
 export type ParticipantLeaveClientMessage = z.infer<typeof ParticipantLeaveClientMessageSchema>;
 export type RoomEndClientMessage = z.infer<typeof RoomEndClientMessageSchema>;
+export type RoomTransferHostClientMessage = z.infer<typeof RoomTransferHostClientMessageSchema>;
 export type ControlSetClientMessage = z.infer<typeof ControlSetClientMessageSchema>;
 export type VideoUpdateClientMessage = z.infer<typeof VideoUpdateClientMessageSchema>;
 export type PlaybackStatusClientMessage = z.infer<typeof PlaybackStatusClientMessageSchema>;
@@ -442,6 +456,9 @@ export type PingClientMessage = z.infer<typeof PingClientMessageSchema>;
 export type RoomCreatedServerMessage = z.infer<typeof RoomCreatedServerMessageSchema>;
 export type RoomJoinedServerMessage = z.infer<typeof RoomJoinedServerMessageSchema>;
 export type RoomRestoredServerMessage = z.infer<typeof RoomRestoredServerMessageSchema>;
+export type RoomHostTransferredServerMessage = z.infer<
+  typeof RoomHostTransferredServerMessageSchema
+>;
 export type CommandAcceptedServerMessage = z.infer<typeof CommandAcceptedServerMessageSchema>;
 export type StateSnapshotServerMessage = z.infer<typeof StateSnapshotServerMessageSchema>;
 export type ErrorServerMessage = z.infer<typeof ErrorServerMessageSchema>;

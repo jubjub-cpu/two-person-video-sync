@@ -58,6 +58,13 @@ interface PendingRequest {
   timer: ReturnType<typeof globalThis.setTimeout>;
 }
 
+interface PendingHostTransfer {
+  requestId: RequestId;
+  resolve: () => void;
+  reject: (error: Error) => void;
+  timer: ReturnType<typeof globalThis.setTimeout>;
+}
+
 interface RoomClientOptions {
   initialTabId: number;
   serverUrl: string;
@@ -182,6 +189,7 @@ class RoomClient {
   private lastSentVideoFingerprint?: string;
   private compatibility: "unknown" | "compatible" | "blocked" = "unknown";
   private endResolver?: () => void;
+  private pendingHostTransfer?: PendingHostTransfer;
   private activeTabId: number;
 
   constructor(private readonly options: RoomClientOptions) {
@@ -342,6 +350,25 @@ class RoomClient {
     this.send({ ...this.envelope(), type: "control.set", controlMode: mode });
   }
 
+  async transferHost(): Promise<void> {
+    if (!this.session) throw new Error("Join or create a room first.");
+    if (this.session.role !== "host") throw new Error("Only the host can pass host control.");
+    if (this.room.participantCount !== 2) {
+      throw new Error("Your friend must be connected before you can pass host control.");
+    }
+    if (this.pendingHostTransfer) throw new Error("Host control is already being passed.");
+
+    const requestId = createRequestId();
+    this.send({ ...this.envelope(requestId), type: "room.transfer-host" });
+    await new Promise<void>((resolve, reject) => {
+      const timer = globalThis.setTimeout(() => {
+        this.pendingHostTransfer = undefined;
+        reject(new Error("The synchronization service did not confirm the new host."));
+      }, REQUEST_TIMEOUT_MS);
+      this.pendingHostTransfer = { requestId, resolve, reject, timer };
+    });
+  }
+
   setReady(autoplayUnlocked: boolean): void {
     if (!this.session) return;
     const snapshot = this.options.getSnapshot();
@@ -358,26 +385,7 @@ class RoomClient {
     if (!this.session || this.socket?.readyState !== WebSocket.OPEN) return;
     const video = protocolVideo(snapshot);
     if (this.peerVideo) {
-      const comparison = compareVideoIdentities(video.identity, this.peerVideo.identity);
-      const safeToSynchronize =
-        comparison.compatible &&
-        video.capabilities.canSeek &&
-        this.peerVideo.capabilities.canSeek &&
-        video.adState !== "advertisement" &&
-        this.peerVideo.adState !== "advertisement";
-      this.compatibility = safeToSynchronize ? "compatible" : "blocked";
-      if (!safeToSynchronize) {
-        this.updateRoom({
-          status: "mismatch",
-          message: "The videos don’t match. Open the same video in both browsers.",
-          peerVideo: safeVideo(this.peerVideo.identity, this.peerVideo.capabilities),
-        });
-      } else if (this.room.status === "mismatch") {
-        this.updateRoom({
-          status: "connected",
-          message: "The videos match. Sync is active.",
-        });
-      }
+      this.updateVideoCompatibility(video, this.peerVideo);
     }
     const videoFingerprint = JSON.stringify(video);
     if (videoFingerprint !== this.lastSentVideoFingerprint) {
@@ -477,10 +485,13 @@ class RoomClient {
 
   markMismatch(remote: SafeVideoIdentity, reason: string): void {
     this.compatibility = "blocked";
+    const followsHost = this.session?.role === "guest";
     this.updateRoom({
       status: "mismatch",
-      message: reason,
-      peerVideo: remote,
+      message: followsHost
+        ? reason
+        : "Your friend is on a different video. Waiting for them to open yours.",
+      peerVideo: followsHost ? remote : undefined,
     });
   }
 
@@ -509,6 +520,11 @@ class RoomClient {
       reject(new Error("The room connection closed."));
     });
     this.pending.clear();
+    if (this.pendingHostTransfer) {
+      globalThis.clearTimeout(this.pendingHostTransfer.timer);
+      this.pendingHostTransfer.reject(new Error("The room connection closed."));
+      this.pendingHostTransfer = undefined;
+    }
     this.socket?.close(1000, "client closing");
     this.socket = undefined;
     if (clearSession) {
@@ -672,6 +688,9 @@ class RoomClient {
           this.persist();
         }
         break;
+      case "room.host-transferred":
+        this.handleHostTransfer(message);
+        break;
       case "video.updated":
         this.handleVideoUpdate(message.participantId, message.video);
         break;
@@ -713,6 +732,12 @@ class RoomClient {
             this.pending.delete(message.requestId);
             pending.reject(error);
           }
+        }
+        const pendingHostTransfer = this.pendingHostTransfer;
+        if (pendingHostTransfer && message.requestId === pendingHostTransfer.requestId) {
+          globalThis.clearTimeout(pendingHostTransfer.timer);
+          pendingHostTransfer.reject(error);
+          this.pendingHostTransfer = undefined;
         }
         const terminal = [
           "ROOM_NOT_FOUND",
@@ -793,29 +818,70 @@ class RoomClient {
     this.peerVideo = video;
     const local = this.options.getSnapshot();
     if (!local) return;
-    const comparison = compareVideoIdentities(protocolVideo(local).identity, video.identity);
+    this.updateVideoCompatibility(protocolVideo(local), video);
+  }
+
+  private updateVideoCompatibility(local: VideoState, remote: VideoState): void {
+    const comparison = compareVideoIdentities(local.identity, remote.identity);
     const safeToSynchronize =
       comparison.compatible &&
       local.capabilities.canSeek &&
-      video.capabilities.canSeek &&
-      local.adState !== "ad" &&
-      video.adState !== "advertisement";
+      remote.capabilities.canSeek &&
+      local.adState !== "advertisement" &&
+      remote.adState !== "advertisement";
     if (!safeToSynchronize) {
       this.compatibility = "blocked";
+      const followsHost = this.session?.role === "guest";
       this.updateRoom({
         status: "mismatch",
         message: comparison.compatible
           ? "Sync is paused while an ad is playing or the player is unavailable."
-          : "The videos don’t match. Open the same video in both browsers.",
-        peerVideo: safeVideo(video.identity, video.capabilities),
+          : followsHost
+            ? "The videos don’t match. Open the host’s video to continue."
+            : "Your friend is on a different video. Waiting for them to open yours.",
+        peerVideo:
+          !comparison.compatible && followsHost
+            ? safeVideo(remote.identity, remote.capabilities)
+            : undefined,
       });
     } else {
       this.compatibility = "compatible";
       this.updateRoom({
-        status: "connected",
-        message: "The videos match. Sync is active.",
-        peerVideo: safeVideo(video.identity, video.capabilities),
+        ...(this.room.status === "mismatch" || this.room.status === "waiting"
+          ? { status: "connected" as const, message: "The videos match. Sync is active." }
+          : {}),
+        peerVideo: safeVideo(remote.identity, remote.capabilities),
       });
+    }
+  }
+
+  private handleHostTransfer(
+    message: Extract<ServerMessage, { type: "room.host-transferred" }>,
+  ): void {
+    if (!this.session) return;
+    const role = message.hostParticipantId === this.session.participantId ? "host" : "guest";
+    this.session.role = role;
+    this.persist();
+    this.updateRoom({
+      role,
+      status: "connected",
+      message:
+        role === "host"
+          ? "You’re now the host. Choose the video for the room."
+          : "Your friend is now the host. Follow their video to stay in sync.",
+    });
+
+    const snapshot = this.options.getSnapshot();
+    if (snapshot) this.updateSnapshot(snapshot);
+    else this.options.onEvent({ type: "background/request-snapshot" });
+
+    if (
+      message.previousHostParticipantId === this.session.participantId &&
+      this.pendingHostTransfer
+    ) {
+      globalThis.clearTimeout(this.pendingHostTransfer.timer);
+      this.pendingHostTransfer.resolve();
+      this.pendingHostTransfer = undefined;
     }
   }
 
@@ -934,11 +1000,11 @@ class RoomClient {
     this.options.onRoom(this.room);
   }
 
-  private envelope() {
+  private envelope(requestId = createRequestId()) {
     if (!this.session) throw new Error("No active room session.");
     return {
       protocolVersion: PROTOCOL_VERSION,
-      requestId: createRequestId(),
+      requestId,
       clientTimeMs: Date.now(),
       roomId: this.session.roomId as RoomId,
       participantId: this.session.participantId as ParticipantId,
@@ -1228,6 +1294,12 @@ export default defineBackground(() => {
         await roomClient?.leave(request.endRoom);
         return resetRoom();
       }
+      case "popup/transfer-host": {
+        const client = roomClient;
+        if (!client) throw new Error("No active room.");
+        await client.transferHost();
+        return client.view();
+      }
       case "popup/set-control-mode": {
         const client = roomClient;
         if (!client) throw new Error("No active room.");
@@ -1288,6 +1360,13 @@ export default defineBackground(() => {
         const client = roomClient;
         if (!client) throw new Error("Join or create a room first.");
         await client.reconnectNow();
+        return client.view();
+      }
+      case "content/transfer-host": {
+        if (contentTabId === undefined) throw new Error("This tab is unavailable.");
+        const client = roomClient;
+        if (!client) throw new Error("Join or create a room first.");
+        await client.transferHost();
         return client.view();
       }
       case "content/leave-room": {
