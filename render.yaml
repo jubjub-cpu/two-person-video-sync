@@ -24,3 +24,5 @@ services:
         value: "false"
       - key: ALLOW_MISSING_ORIGIN
         value: "false"
+      - key: MAX_PARTICIPANTS_PER_ROOM
+        value: "8"

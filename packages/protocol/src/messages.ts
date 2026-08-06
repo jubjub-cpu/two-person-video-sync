@@ -34,6 +34,13 @@ export const PlaybackPositionSchema = z
 export const PlaybackRateSchema = z.number().finite().min(0.25).max(4);
 export const ControlModeSchema = z.enum(["host-only", "shared"]);
 export const ParticipantRoleSchema = z.enum(["host", "guest"]);
+export const DEFAULT_ROOM_PARTICIPANT_CAPACITY = 8;
+export const MAX_ROOM_PARTICIPANT_CAPACITY = 32;
+export const RoomParticipantCapacitySchema = z
+  .number()
+  .int()
+  .min(2)
+  .max(MAX_ROOM_PARTICIPANT_CAPACITY);
 export const PlaybackStatusSchema = z.enum([
   "waiting",
   "stalled",
@@ -106,6 +113,7 @@ export const ParticipantSummarySchema = z
   .object({
     participantId: ParticipantIdSchema,
     role: ParticipantRoleSchema,
+    connected: z.boolean(),
     ready: z.boolean(),
     playbackStatus: PlaybackStatusSchema,
   })
@@ -163,6 +171,7 @@ export const RoomEndClientMessageSchema = AuthenticatedClientEnvelopeSchema.exte
 
 export const RoomTransferHostClientMessageSchema = AuthenticatedClientEnvelopeSchema.extend({
   type: z.literal("room.transfer-host"),
+  targetParticipantId: ParticipantIdSchema,
 });
 
 export const ControlSetClientMessageSchema = AuthenticatedClientEnvelopeSchema.extend({
@@ -246,8 +255,9 @@ const RoomSessionFields = {
   role: ParticipantRoleSchema,
   controlMode: ControlModeSchema,
   hostParticipantId: ParticipantIdSchema,
+  participantCapacity: RoomParticipantCapacitySchema,
   expiresAtMs: TimestampMsSchema,
-  participants: z.array(ParticipantSummarySchema).min(1).max(2),
+  participants: z.array(ParticipantSummarySchema).min(1).max(MAX_ROOM_PARTICIPANT_CAPACITY),
   state: PlaybackStateSchema.optional(),
 } as const;
 
@@ -301,7 +311,7 @@ export const RoomHostTransferredServerMessageSchema = OrderedServerEnvelopeSchem
   type: z.literal("room.host-transferred"),
   previousHostParticipantId: ParticipantIdSchema,
   hostParticipantId: ParticipantIdSchema,
-  participants: z.array(ParticipantSummarySchema).length(2),
+  participants: z.array(ParticipantSummarySchema).min(2).max(MAX_ROOM_PARTICIPANT_CAPACITY),
 });
 
 export const VideoUpdatedServerMessageSchema = OrderedServerEnvelopeSchema.extend({
@@ -336,7 +346,7 @@ export const StateSnapshotServerMessageSchema = OrderedServerEnvelopeSchema.exte
   type: z.literal("state.snapshot"),
   authoritativeParticipantId: ParticipantIdSchema,
   state: PlaybackStateSchema,
-  participants: z.array(ParticipantSummarySchema).min(1).max(2),
+  participants: z.array(ParticipantSummarySchema).min(1).max(MAX_ROOM_PARTICIPANT_CAPACITY),
 });
 
 export const PongServerMessageSchema = ServerEnvelopeSchema.extend({
@@ -432,6 +442,7 @@ export type PlaybackState = z.infer<typeof PlaybackStateSchema>;
 export type PlaybackCommand = z.infer<typeof PlaybackCommandSchema>;
 export type ControlMode = z.infer<typeof ControlModeSchema>;
 export type ParticipantRole = z.infer<typeof ParticipantRoleSchema>;
+export type RoomParticipantCapacity = z.infer<typeof RoomParticipantCapacitySchema>;
 export type PlaybackStatus = z.infer<typeof PlaybackStatusSchema>;
 export type LeaveReason = z.infer<typeof LeaveReasonSchema>;
 export type ProtocolErrorCode = z.infer<typeof ProtocolErrorCodeSchema>;

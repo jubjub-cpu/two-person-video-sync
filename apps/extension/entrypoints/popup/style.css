@@ -762,8 +762,39 @@ input[role="switch"] {
   gap: 8px;
 }
 
+.host-transfer {
+  border-bottom: 1px solid var(--border);
+  margin: -2px 0 12px;
+  padding-bottom: 12px;
+}
+
+.host-transfer > label {
+  color: var(--content-secondary);
+  display: block;
+  font-size: 11px;
+  font-weight: 650;
+  margin-bottom: 7px;
+  text-transform: uppercase;
+}
+
+.transfer-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+#host-target {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  color: var(--content-primary);
+  font: inherit;
+  min-width: 0;
+  padding: 9px 10px;
+}
+
 .transfer-button {
-  margin-bottom: 8px;
+  min-height: 40px;
 }
 
 .button-row > * {

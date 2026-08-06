@@ -1,4 +1,5 @@
 import {
+  DEFAULT_ROOM_PARTICIPANT_CAPACITY,
   PROTOCOL_VERSION,
   compareVideoIdentities,
   createCommandId,
@@ -8,6 +9,7 @@ import {
   normalizeRoomCode,
   type ClientMessage,
   type ParticipantId,
+  type ParticipantSummary,
   type PlaybackCommand,
   type ReconnectToken,
   type RequestId,
@@ -78,6 +80,8 @@ interface RoomClientOptions {
 function defaultRoom(controlMode: ControlMode = "host-only"): RoomView {
   return {
     participantCount: 0,
+    participantCapacity: DEFAULT_ROOM_PARTICIPANT_CAPACITY,
+    participants: [],
     controlMode,
     status: "ready",
     message: "Video found and ready.",
@@ -164,12 +168,12 @@ function safeVideo(
 
 function requestError(message: Extract<ServerMessage, { type: "error" }>): Error {
   const friendly: Partial<Record<typeof message.code, string>> = {
-    ROOM_FULL: "This private room already has two participants.",
+    ROOM_FULL: "This room has reached its participant limit.",
     ROOM_NOT_FOUND: "That room was not found or has expired.",
     INVALID_ROOM_CODE: "The room code is not valid.",
     RATE_LIMITED: "Too many requests. Wait briefly and try again.",
     NOT_AUTHORIZED: "Only the host can do that in the current control mode.",
-    VIDEO_MISMATCH: "The two tabs appear to have different videos open.",
+    VIDEO_MISMATCH: "The room has different videos open.",
   };
   return new Error(friendly[message.code] ?? message.message);
 }
@@ -185,9 +189,9 @@ class RoomClient {
   private reconnectAttempt = 0;
   private intentionalClose = false;
   private connecting?: Promise<void>;
-  private peerVideo?: VideoState;
+  private readonly participants = new Map<ParticipantId, ParticipantSummary>();
+  private readonly remoteVideos = new Map<ParticipantId, VideoState>();
   private lastSentVideoFingerprint?: string;
-  private compatibility: "unknown" | "compatible" | "blocked" = "unknown";
   private endResolver?: () => void;
   private pendingHostTransfer?: PendingHostTransfer;
   private activeTabId: number;
@@ -199,7 +203,18 @@ class RoomClient {
       ? {
           roomCode: options.restored.roomCode,
           role: options.restored.role,
+          hostParticipantId: options.restored.hostParticipantId,
           participantCount: 1,
+          participantCapacity:
+            options.restored.participantCapacity ?? DEFAULT_ROOM_PARTICIPANT_CAPACITY,
+          participants: [
+            {
+              participantId: options.restored.participantId,
+              role: options.restored.role,
+              connected: true,
+              isSelf: true,
+            },
+          ],
           controlMode: options.restored.controlMode,
           status: "reconnecting",
           message: "Restoring the private room…",
@@ -217,7 +232,6 @@ class RoomClient {
     if (this.activeTabId === tabId) return;
     this.activeTabId = tabId;
     this.lastSentVideoFingerprint = undefined;
-    this.compatibility = "unknown";
     if (this.session) {
       this.session.tabId = tabId;
       this.persist();
@@ -350,16 +364,21 @@ class RoomClient {
     this.send({ ...this.envelope(), type: "control.set", controlMode: mode });
   }
 
-  async transferHost(): Promise<void> {
+  async transferHost(targetParticipantId: string): Promise<void> {
     if (!this.session) throw new Error("Join or create a room first.");
     if (this.session.role !== "host") throw new Error("Only the host can pass host control.");
-    if (this.room.participantCount !== 2) {
-      throw new Error("Your friend must be connected before you can pass host control.");
+    const target = this.participants.get(targetParticipantId as ParticipantId);
+    if (!target || !target.connected || target.role !== "guest") {
+      throw new Error("Choose a connected guest before passing host control.");
     }
     if (this.pendingHostTransfer) throw new Error("Host control is already being passed.");
 
     const requestId = createRequestId();
-    this.send({ ...this.envelope(requestId), type: "room.transfer-host" });
+    this.send({
+      ...this.envelope(requestId),
+      type: "room.transfer-host",
+      targetParticipantId: target.participantId,
+    });
     await new Promise<void>((resolve, reject) => {
       const timer = globalThis.setTimeout(() => {
         this.pendingHostTransfer = undefined;
@@ -384,15 +403,13 @@ class RoomClient {
   updateSnapshot(snapshot: VideoSnapshot): void {
     if (!this.session || this.socket?.readyState !== WebSocket.OPEN) return;
     const video = protocolVideo(snapshot);
-    if (this.peerVideo) {
-      this.updateVideoCompatibility(video, this.peerVideo);
-    }
+    this.refreshVideoCompatibility(video);
     const videoFingerprint = JSON.stringify(video);
     if (videoFingerprint !== this.lastSentVideoFingerprint) {
       this.send({ ...this.envelope(), type: "video.update", video });
       this.lastSentVideoFingerprint = videoFingerprint;
     }
-    if (this.session.role === "guest" && this.session.controlMode === "host-only") {
+    if (this.session.role === "guest") {
       this.persist();
       return;
     }
@@ -484,13 +501,10 @@ class RoomClient {
   }
 
   markMismatch(remote: SafeVideoIdentity, reason: string): void {
-    this.compatibility = "blocked";
     const followsHost = this.session?.role === "guest";
     this.updateRoom({
       status: "mismatch",
-      message: followsHost
-        ? reason
-        : "Your friend is on a different video. Waiting for them to open yours.",
+      message: followsHost ? reason : "Someone in the room is on a different video.",
       peerVideo: followsHost ? remote : undefined,
     });
   }
@@ -498,7 +512,6 @@ class RoomClient {
   suspendForNavigation(): void {
     if (!this.session) return;
     this.lastSentVideoFingerprint = undefined;
-    this.compatibility = "unknown";
     this.updateRoom({
       status: "waiting",
       message: "Page changed. Waiting to verify the new video before resuming.",
@@ -529,9 +542,9 @@ class RoomClient {
     this.socket = undefined;
     if (clearSession) {
       this.session = undefined;
-      this.peerVideo = undefined;
+      this.participants.clear();
+      this.remoteVideos.clear();
       this.lastSentVideoFingerprint = undefined;
-      this.compatibility = "unknown";
       this.options.onPersist(undefined);
       this.room = defaultRoom(this.room.controlMode);
       this.options.onRoom(this.room);
@@ -657,30 +670,46 @@ class RoomClient {
       case "room.restored":
         this.acceptSession(message);
         break;
-      case "participant.joined":
-        this.updateRoom({
-          participantCount: 2,
-          status: "connected",
-          message: "Connected to the other participant.",
-        });
+      case "participant.joined": {
+        this.participants.set(message.participant.participantId, message.participant);
+        this.syncParticipantRoom("A participant connected.");
         break;
-      case "participant.left":
-        this.updateRoom({
-          participantCount: 1,
-          status: "waiting",
-          message: "The other participant left. Waiting for reconnection…",
-        });
-        break;
-      case "participant.ready":
-        if (this.session && message.participantId !== this.session.participantId) {
-          this.updateRoom({
-            status: message.ready ? "connected" : "waiting",
-            message: message.ready
-              ? "Both participants are ready."
-              : "Waiting for the other participant to get ready.",
+      }
+      case "participant.left": {
+        const current = this.participants.get(message.participantId);
+        if (message.reason === "disconnect" && current) {
+          this.participants.set(message.participantId, {
+            ...current,
+            connected: false,
+            ready: false,
+            playbackStatus: "waiting",
           });
+        } else {
+          this.participants.delete(message.participantId);
         }
+        this.remoteVideos.delete(message.participantId);
+        this.syncParticipantRoom(
+          this.connectedParticipantCount() > 1
+            ? "A participant disconnected. The room is still active."
+            : "Waiting for people to connect…",
+        );
         break;
+      }
+      case "participant.ready": {
+        const current = this.participants.get(message.participantId);
+        if (current) {
+          this.participants.set(message.participantId, { ...current, ready: message.ready });
+        }
+        const connected = [...this.participants.values()].filter(
+          (candidate) => candidate.connected,
+        );
+        const allReady = connected.length > 1 && connected.every((candidate) => candidate.ready);
+        this.syncParticipantRoom(
+          allReady ? "Everyone is ready." : "Waiting for everyone to get ready.",
+          allReady ? "connected" : "waiting",
+        );
+        break;
+      }
       case "control.updated":
         this.updateRoom({ controlMode: message.controlMode });
         if (this.session) {
@@ -718,6 +747,7 @@ class RoomClient {
         this.close(true);
         this.updateRoom({
           participantCount: 0,
+          participants: [],
           status: "offline",
           message:
             message.reason === "host-ended" ? "The host ended the room." : "The room expired.",
@@ -752,7 +782,7 @@ class RoomClient {
             ? "offline"
             : message.retryable
               ? "reconnecting"
-              : this.room.participantCount === 2
+              : this.room.participantCount > 1
                 ? "connected"
                 : this.room.status,
           message: error.message,
@@ -771,13 +801,18 @@ class RoomClient {
 
   private acceptSession(message: RoomSessionMessage): void {
     const priorClientSequence = this.session?.clientSequence ?? 0;
-    this.peerVideo = undefined;
-    this.compatibility = "unknown";
+    this.participants.clear();
+    for (const participant of message.participants) {
+      this.participants.set(participant.participantId, participant);
+    }
+    this.remoteVideos.clear();
     this.session = {
       tabId: this.activeTabId,
       roomCode: message.roomCode,
       roomId: message.roomId,
       role: message.role,
+      hostParticipantId: message.hostParticipantId,
+      participantCapacity: message.participantCapacity,
       participantId: message.participantId,
       sessionId: message.sessionId,
       reconnectToken: message.reconnectToken,
@@ -787,16 +822,20 @@ class RoomClient {
       clientSequence: priorClientSequence,
     };
     this.persist();
+    const participantCount = this.connectedParticipantCount();
     this.room = {
       roomCode: message.roomCode,
       role: message.role,
-      participantCount: message.participants.length as 1 | 2,
+      hostParticipantId: message.hostParticipantId,
+      participantCount,
+      participantCapacity: message.participantCapacity,
+      participants: this.participantViews(),
       controlMode: message.controlMode,
-      status: message.participants.length === 2 ? "connected" : "waiting",
+      status: participantCount > 1 ? "connected" : "waiting",
       message:
-        message.participants.length === 2
-          ? "Connected to the other participant."
-          : "Share the private room code with one person.",
+        participantCount > 1
+          ? `${participantCount - 1} ${participantCount === 2 ? "person is" : "people are"} connected with you.`
+          : `Share the private room code with up to ${message.participantCapacity - 1} people.`,
       expiresAt: message.expiresAtMs,
       reconnecting: false,
     };
@@ -815,13 +854,13 @@ class RoomClient {
 
   private handleVideoUpdate(participantId: ParticipantId, video: VideoState): void {
     if (!this.session || participantId === this.session.participantId) return;
-    this.peerVideo = video;
+    this.remoteVideos.set(participantId, video);
     const local = this.options.getSnapshot();
     if (!local) return;
-    this.updateVideoCompatibility(protocolVideo(local), video);
+    this.refreshVideoCompatibility(protocolVideo(local));
   }
 
-  private updateVideoCompatibility(local: VideoState, remote: VideoState): void {
+  private videoCompatibility(local: VideoState, remote: VideoState) {
     const comparison = compareVideoIdentities(local.identity, remote.identity);
     const safeToSynchronize =
       comparison.compatible &&
@@ -829,30 +868,96 @@ class RoomClient {
       remote.capabilities.canSeek &&
       local.adState !== "advertisement" &&
       remote.adState !== "advertisement";
-    if (!safeToSynchronize) {
-      this.compatibility = "blocked";
-      const followsHost = this.session?.role === "guest";
+    return { comparison, safeToSynchronize };
+  }
+
+  private canSynchronizeWith(participantId: ParticipantId): boolean {
+    const local = this.options.getSnapshot();
+    const remote = this.remoteVideos.get(participantId);
+    return Boolean(
+      local && remote && this.videoCompatibility(protocolVideo(local), remote).safeToSynchronize,
+    );
+  }
+
+  private refreshVideoCompatibility(local: VideoState): void {
+    if (!this.session) return;
+    const remoteParticipantIds =
+      this.session.role === "guest" && this.session.hostParticipantId
+        ? [this.session.hostParticipantId as ParticipantId]
+        : [...this.participants.values()]
+            .filter(
+              (participant) =>
+                participant.connected && participant.participantId !== this.session?.participantId,
+            )
+            .map((participant) => participant.participantId);
+    const remoteStates = remoteParticipantIds.flatMap((participantId) => {
+      const video = this.remoteVideos.get(participantId);
+      return video ? [{ participantId, video }] : [];
+    });
+    if (remoteStates.length === 0) {
+      this.updateRoom({ peerVideo: undefined });
+      return;
+    }
+
+    const blocked = remoteStates.filter(
+      ({ video }) => !this.videoCompatibility(local, video).safeToSynchronize,
+    );
+    const followsHost = this.session.role === "guest";
+    const hostVideo = followsHost ? remoteStates[0]?.video : undefined;
+    if (blocked.length > 0) {
+      const hostComparison = hostVideo
+        ? this.videoCompatibility(local, hostVideo).comparison
+        : undefined;
       this.updateRoom({
         status: "mismatch",
-        message: comparison.compatible
-          ? "Sync is paused while an ad is playing or the player is unavailable."
-          : followsHost
-            ? "The videos don’t match. Open the host’s video to continue."
-            : "Your friend is on a different video. Waiting for them to open yours.",
+        message: followsHost
+          ? hostComparison?.compatible
+            ? "Sync is paused while an ad is playing or the player is unavailable."
+            : "The videos don’t match. Open the host’s video to continue."
+          : `${blocked.length} ${blocked.length === 1 ? "person is" : "people are"} on a different video.`,
         peerVideo:
-          !comparison.compatible && followsHost
-            ? safeVideo(remote.identity, remote.capabilities)
+          followsHost && hostVideo && !hostComparison?.compatible
+            ? safeVideo(hostVideo.identity, hostVideo.capabilities)
             : undefined,
       });
     } else {
-      this.compatibility = "compatible";
       this.updateRoom({
         ...(this.room.status === "mismatch" || this.room.status === "waiting"
           ? { status: "connected" as const, message: "The videos match. Sync is active." }
           : {}),
-        peerVideo: safeVideo(remote.identity, remote.capabilities),
+        peerVideo: hostVideo ? safeVideo(hostVideo.identity, hostVideo.capabilities) : undefined,
       });
     }
+  }
+
+  private connectedParticipantCount(): number {
+    return [...this.participants.values()].filter((participant) => participant.connected).length;
+  }
+
+  private participantViews(): RoomView["participants"] {
+    return [...this.participants.values()].map((participant) => ({
+      participantId: participant.participantId,
+      role: participant.role,
+      connected: participant.connected,
+      isSelf: participant.participantId === this.session?.participantId,
+    }));
+  }
+
+  private syncParticipantRoom(message?: string, status?: RoomView["status"]): void {
+    const participantCount = this.connectedParticipantCount();
+    const peerCount = Math.max(0, participantCount - 1);
+    this.updateRoom({
+      participantCount,
+      participants: this.participantViews(),
+      status: status ?? (participantCount > 1 ? "connected" : "waiting"),
+      message:
+        message ??
+        (participantCount > 1
+          ? `${peerCount} ${peerCount === 1 ? "person is" : "people are"} connected with you.`
+          : "Waiting for people to connect…"),
+    });
+    const local = this.options.getSnapshot();
+    if (local) this.refreshVideoCompatibility(protocolVideo(local));
   }
 
   private handleHostTransfer(
@@ -861,14 +966,22 @@ class RoomClient {
     if (!this.session) return;
     const role = message.hostParticipantId === this.session.participantId ? "host" : "guest";
     this.session.role = role;
+    this.session.hostParticipantId = message.hostParticipantId;
+    this.participants.clear();
+    for (const participant of message.participants) {
+      this.participants.set(participant.participantId, participant);
+    }
     this.persist();
     this.updateRoom({
       role,
+      hostParticipantId: message.hostParticipantId,
+      participantCount: this.connectedParticipantCount(),
+      participants: this.participantViews(),
       status: "connected",
       message:
         role === "host"
           ? "You’re now the host. Choose the video for the room."
-          : "Your friend is now the host. Follow their video to stay in sync.",
+          : "A new host is leading the room. Follow their video to stay in sync.",
     });
 
     const snapshot = this.options.getSnapshot();
@@ -890,14 +1003,25 @@ class RoomClient {
     status: "waiting" | "stalled" | "playing" | "can-play" | "paused" | "ended" | "advertisement",
   ): void {
     if (!this.session || participantId === this.session.participantId) return;
-    if (this.compatibility !== "compatible") return;
-    if (status === "waiting" || status === "stalled" || status === "advertisement") {
+    const participant = this.participants.get(participantId);
+    if (participant) {
+      this.participants.set(participantId, { ...participant, playbackStatus: status });
+      this.updateRoom({ participants: this.participantViews() });
+    }
+    if (!this.canSynchronizeWith(participantId)) return;
+    const blockers = [...this.participants.values()].filter(
+      (candidate) =>
+        candidate.connected &&
+        candidate.participantId !== this.session?.participantId &&
+        (candidate.playbackStatus === "waiting" ||
+          candidate.playbackStatus === "stalled" ||
+          candidate.playbackStatus === "advertisement") &&
+        this.canSynchronizeWith(candidate.participantId),
+    );
+    if (blockers.length > 0) {
       this.updateRoom({
         status: "peer-buffering",
-        message:
-          status === "advertisement"
-            ? "Synchronization is paused during the other participant’s ad."
-            : "The other participant is buffering. Holding playback briefly.",
+        message: `${blockers.length} ${blockers.length === 1 ? "person is" : "people are"} buffering. Holding playback briefly.`,
       });
       this.options.onEvent({
         type: "background/remote-command",
@@ -913,17 +1037,15 @@ class RoomClient {
     } else if (status === "can-play" || status === "playing") {
       this.updateRoom({
         status: "connected",
-        message: "Both players are ready. Resynchronizing…",
+        message: "Everyone is ready. Resynchronizing…",
       });
       this.options.onEvent({ type: "background/request-snapshot" });
-    } else if (status === "ended") {
-      this.updateRoom({ status: "ended", message: "The other participant reached the end." });
     }
   }
 
   private handleCommand(message: Extract<ServerMessage, { type: "command.accepted" }>): void {
     if (!this.session || message.originParticipantId === this.session.participantId) return;
-    if (this.compatibility !== "compatible") return;
+    if (!this.canSynchronizeWith(message.originParticipantId)) return;
     const command = message.action;
     const projectedPosition =
       command.type === "play"
@@ -948,15 +1070,22 @@ class RoomClient {
     });
     this.updateRoom({
       status: "in-sync",
-      message: "Applied the other participant’s playback change.",
+      message: "Applied a participant’s playback change.",
     });
   }
 
   private handleSnapshot(message: Extract<ServerMessage, { type: "state.snapshot" }>): void {
     if (!this.session || message.authoritativeParticipantId === this.session.participantId) return;
-    if (this.compatibility !== "compatible") return;
+    for (const participant of message.participants) {
+      this.participants.set(participant.participantId, participant);
+    }
+    this.updateRoom({
+      participantCount: this.connectedParticipantCount(),
+      participants: this.participantViews(),
+    });
+    if (!this.canSynchronizeWith(message.authoritativeParticipantId)) return;
     const local = this.options.getSnapshot();
-    const remoteVideo = this.peerVideo;
+    const remoteVideo = this.remoteVideos.get(message.authoritativeParticipantId);
     if (!local || !remoteVideo) return;
     const snapshot: VideoSnapshot = {
       identity: safeVideo(remoteVideo.identity, remoteVideo.capabilities),
@@ -1297,7 +1426,7 @@ export default defineBackground(() => {
       case "popup/transfer-host": {
         const client = roomClient;
         if (!client) throw new Error("No active room.");
-        await client.transferHost();
+        await client.transferHost(request.targetParticipantId);
         return client.view();
       }
       case "popup/set-control-mode": {
@@ -1366,7 +1495,7 @@ export default defineBackground(() => {
         if (contentTabId === undefined) throw new Error("This tab is unavailable.");
         const client = roomClient;
         if (!client) throw new Error("Join or create a room first.");
-        await client.transferHost();
+        await client.transferHost(request.targetParticipantId);
         return client.view();
       }
       case "content/leave-room": {

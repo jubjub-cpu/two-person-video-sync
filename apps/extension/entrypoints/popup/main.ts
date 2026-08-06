@@ -1,4 +1,5 @@
 import { browser } from "wxt/browser";
+import { DEFAULT_ROOM_PARTICIPANT_CAPACITY } from "@vyzync/protocol";
 
 import { sendRuntimeRequest } from "../../lib/bridge";
 import { compatibilityNoticeFor } from "../../lib/compatibility-notice";
@@ -49,6 +50,8 @@ const elements = {
   openPeerVideo: required<HTMLButtonElement>("open-peer-video"),
   roomModeRow: required<HTMLElement>("room-mode-row"),
   roomMode: required<HTMLInputElement>("room-mode"),
+  hostTransfer: required<HTMLElement>("host-transfer"),
+  hostTarget: required<HTMLSelectElement>("host-target"),
   passHost: required<HTMLButtonElement>("pass-host"),
   leaveRoom: required<HTMLButtonElement>("leave-room"),
   endRoom: required<HTMLButtonElement>("end-room"),
@@ -128,14 +131,28 @@ function renderRoom(room: RoomView): void {
   elements.statusTitle.textContent = statusTitle(room.status);
   elements.statusMessage.textContent = room.message;
   if (!inRoom) return;
-  elements.roomRole.textContent = room.role === "host" ? "You’re the host" : "You’re the guest";
-  elements.participantCount.textContent = `${room.participantCount} of 2`;
+  elements.roomRole.textContent = room.role === "host" ? "You’re the host" : "You’re a guest";
+  elements.participantCount.textContent = `${room.participantCount} of ${room.participantCapacity}`;
   elements.roomCodeWrap.hidden = room.role !== "host" || !room.roomCode;
   elements.roomCodeDisplay.textContent = room.roomCode ?? "—";
   elements.readyButton.hidden = room.status !== "autoplay-blocked";
   elements.roomMode.checked = room.controlMode === "shared";
   elements.roomModeRow.hidden = room.role !== "host";
-  elements.passHost.hidden = room.role !== "host" || room.participantCount !== 2;
+  const previousTarget = elements.hostTarget.value;
+  const transferTargets = room.participants.filter(
+    (participant) => participant.connected && !participant.isSelf && participant.role === "guest",
+  );
+  elements.hostTarget.replaceChildren();
+  transferTargets.forEach((participant, index) => {
+    const option = document.createElement("option");
+    option.value = participant.participantId;
+    option.textContent = `Connected person ${index + 1}`;
+    elements.hostTarget.append(option);
+  });
+  if (transferTargets.some((participant) => participant.participantId === previousTarget)) {
+    elements.hostTarget.value = previousTarget;
+  }
+  elements.hostTransfer.hidden = room.role !== "host" || transferTargets.length === 0;
   elements.endRoom.hidden = room.role !== "host";
   const peerUrl = canonicalUrl(room.peerVideo);
   elements.openPeerVideo.hidden = room.status !== "mismatch" || peerUrl === null;
@@ -147,11 +164,11 @@ function statusTitle(status: RoomView["status"]): string {
     disabled: "Extension not enabled",
     "no-video": "No supported video found",
     ready: "Ready to sync",
-    waiting: "Waiting for the other person",
-    connected: "Connected to peer",
+    waiting: "Waiting for people",
+    connected: "Room connected",
     "in-sync": "In sync",
     correcting: "Correcting drift",
-    "peer-buffering": "Peer is buffering",
+    "peer-buffering": "Someone is buffering",
     mismatch: "Different videos detected",
     "autoplay-blocked": "One click needed",
     reconnecting: "Reconnecting",
@@ -231,6 +248,8 @@ async function refresh(): Promise<void> {
       candidates: [],
       room: {
         participantCount: 0,
+        participantCapacity: DEFAULT_ROOM_PARTICIPANT_CAPACITY,
+        participants: [],
         controlMode: settings.defaultControlMode,
         status: supportedPage ? "disabled" : "no-video",
         message: supportedPage
@@ -316,7 +335,13 @@ elements.passHost.addEventListener(
   "click",
   () =>
     void withLoading(async () => {
-      await sendRuntimeRequest({ type: "popup/transfer-host", tabId: activeTabId! });
+      const targetParticipantId = elements.hostTarget.value;
+      if (!targetParticipantId) throw new Error("Choose who should become host.");
+      await sendRuntimeRequest({
+        type: "popup/transfer-host",
+        tabId: activeTabId!,
+        targetParticipantId,
+      });
       await refresh();
     }),
 );

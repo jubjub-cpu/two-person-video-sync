@@ -1,8 +1,8 @@
 # Vyzync
 
-A Chrome and Firefox extension that keeps play, pause, seeking, and playback speed synchronized for two people watching the same HTML5 video.
+A Chrome and Firefox extension that keeps play, pause, seeking, and playback speed synchronized for groups of up to eight people watching the same HTML5 video.
 
-Each person streams the video from their own account. The extension does not share, download, or transmit video or audio.
+Each participant streams the video from their own account. The extension does not share, download, or transmit video or audio.
 
 ## Install
 
@@ -12,14 +12,14 @@ Firefox Add-ons reviews are approved. Source and reviewer packages remain availa
 
 ### Chrome
 
-1. Download `vyzync-chrome-0.3.0.zip`.
+1. Download `vyzyncextension-0.4.0-chrome.zip`.
 2. Extract the ZIP.
 3. Open `chrome://extensions` and turn on **Developer mode**.
 4. Select **Load unpacked** and choose the extracted folder.
 
 ### Firefox
 
-1. Download `vyzync-firefox-0.3.0.zip`.
+1. Download `vyzyncextension-0.4.0-firefox.zip`.
 2. Extract the ZIP.
 3. Open `about:debugging#/runtime/this-firefox`.
 4. Select **Load Temporary Add-on** and choose `manifest.json` from the extracted folder.
@@ -29,14 +29,14 @@ permanent installation and automatic updates.
 
 ## Use
 
-1. Both people open the same video and select **Enable on this site** once.
+1. Everyone opens the same video and selects **Enable on this site** once.
 2. The host selects **Create private room**. The room code is copied automatically.
-3. The other person pastes the code into **Join a room** and presses Enter.
-4. To change videos, both people open the same next video. The room stays connected and automatically follows the active video tab.
+3. Up to seven guests paste the code into **Join a room** and press Enter.
+4. To change videos, everyone opens the same next video. The room stays connected and automatically follows the active video tab.
 
 The synchronization service is already included in the extension. No server address or connection setup is required. The first room after the free service has been idle can take up to a minute to start.
 
-The host controls playback by default. **Either person** mode can be selected before creating the room.
+The host controls playback by default. **Anyone** mode can be selected before creating the room.
 
 ## Build from source
 

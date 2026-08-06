@@ -187,7 +187,7 @@ test("two isolated extension profiles create, join, synchronize, recover, and av
 
     await host.popup.locator("#create-room").click();
     await expect(host.popup.locator("#room-panel")).toBeVisible();
-    await expect(host.popup.locator("#participant-count")).toHaveText("1 of 2");
+    await expect(host.popup.locator("#participant-count")).toHaveText("1 of 8");
     await expect(host.popup.locator("#room-code-display")).toHaveText(/^[2-9A-HJ-NP-Z]{16}$/);
     const roomCode = (await host.popup.locator("#room-code-display").textContent())?.trim();
     expect(roomCode).toMatch(/^[2-9A-HJ-NP-Z]{16}$/);
@@ -197,7 +197,7 @@ test("two isolated extension profiles create, join, synchronize, recover, and av
     await expect(hostBadgeToggle).toHaveAttribute("aria-expanded", "false");
     await hostBadgeToggle.click();
     await expect(hostBadge.locator(".menu")).toBeVisible();
-    await expect(hostBadge.locator(".friend-value")).toHaveText("Disconnected");
+    await expect(hostBadge.locator(".friend-value")).toHaveText("Only you");
     await expect(hostBadge.locator(".quality-value")).toHaveText("Unavailable");
     await expect(hostBadge.locator("[data-action='copy']")).toBeEnabled();
     await expect(hostBadge.locator("[data-action='reconnect']")).toBeEnabled();
@@ -216,10 +216,10 @@ test("two isolated extension profiles create, join, synchronize, recover, and av
     await host.fixture.waitForTimeout(250);
     await guest.popup.locator("#room-code").fill(roomCode!);
     await guest.popup.locator("#join-form button[type='submit']").click();
-    await expect(guest.popup.locator("#participant-count")).toHaveText("2 of 2");
-    await expect(host.popup.locator("#participant-count")).toHaveText("2 of 2");
+    await expect(guest.popup.locator("#participant-count")).toHaveText("2 of 8");
+    await expect(host.popup.locator("#participant-count")).toHaveText("2 of 8");
     await hostBadgeToggle.click();
-    await expect(hostBadge.locator(".friend-value")).toHaveText("Connected");
+    await expect(hostBadge.locator(".friend-value")).toHaveText("2 connected");
     await expect(hostBadge.locator(".quality-value")).toHaveText(/^(Good|Fair|Poor) · \d+ ms$/);
 
     const manualReconnectCountBefore = await host.worker.evaluate(
@@ -244,7 +244,7 @@ test("two isolated extension profiles create, join, synchronize, recover, and av
         ),
       )
       .toBeGreaterThan(manualReconnectCountBefore);
-    await expect(host.popup.locator("#participant-count")).toHaveText("2 of 2");
+    await expect(host.popup.locator("#participant-count")).toHaveText("2 of 8");
     await expect(hostBadge.locator(".feedback")).toHaveText("Reconnected.");
     await hostBadgeToggle.click();
     await expect
@@ -445,6 +445,63 @@ test("two isolated extension profiles create, join, synchronize, recover, and av
   }
 });
 
+test("three extension profiles share one room, one timeline, and targeted host control", async () => {
+  const host = await launchProfile("group-host");
+  const firstGuest = await launchProfile("group-first-guest");
+  const secondGuest = await launchProfile("group-second-guest");
+  try {
+    await host.popup.locator("#create-room").click();
+    await expect(host.popup.locator("#room-code-display")).toHaveText(/^[2-9A-HJ-NP-Z]{16}$/);
+    const roomCode = (await host.popup.locator("#room-code-display").textContent())!.trim();
+
+    await firstGuest.popup.locator("#room-code").fill(roomCode);
+    await firstGuest.popup.locator("#join-form button[type='submit']").click();
+    await secondGuest.popup.locator("#room-code").fill(roomCode);
+    await secondGuest.popup.locator("#join-form button[type='submit']").click();
+
+    for (const profile of [host, firstGuest, secondGuest]) {
+      await expect(profile.popup.locator("#participant-count")).toHaveText("3 of 8");
+    }
+    await expect(host.popup.locator("#host-transfer")).toBeVisible();
+    await expect(host.popup.locator("#host-target option")).toHaveCount(2);
+
+    const hostBadge = host.fixture.locator("[data-vyzync='badge']");
+    await hostBadge.locator(".badge-toggle").click();
+    await expect(hostBadge.locator(".friend-value")).toHaveText("3 connected");
+    await expect(hostBadge.locator(".transfer-target option")).toHaveCount(2);
+
+    await host.fixture.locator("#main-video").evaluate((element) => {
+      const video = element as HTMLVideoElement;
+      video.pause();
+      video.currentTime = 2.4;
+    });
+    for (const guest of [firstGuest, secondGuest]) {
+      await expect
+        .poll(async () => Math.abs((await mediaState(guest.fixture)).currentTime - 2.4))
+        .toBeLessThan(0.25);
+    }
+
+    await host.popup.locator("#host-target").selectOption({ index: 1 });
+    await host.popup.locator("#pass-host").click();
+    await expect(host.popup.locator("#room-role")).toHaveText("You’re a guest");
+    await expect(firstGuest.popup.locator("#room-role")).toHaveText("You’re a guest");
+    await expect(secondGuest.popup.locator("#room-role")).toHaveText("You’re the host");
+
+    await secondGuest.fixture.locator("#main-video").evaluate((element) => {
+      const video = element as HTMLVideoElement;
+      video.pause();
+      video.currentTime = 3.2;
+    });
+    for (const follower of [host, firstGuest]) {
+      await expect
+        .poll(async () => Math.abs((await mediaState(follower.fixture)).currentTime - 3.2))
+        .toBeLessThan(0.25);
+    }
+  } finally {
+    await Promise.all([closeProfile(host), closeProfile(firstGuest), closeProfile(secondGuest)]);
+  }
+});
+
 test("one room follows both participants to matching videos in separate tabs", async () => {
   const host = await launchProfile("tab-handoff-host");
   const guest = await launchProfile("tab-handoff-guest");
@@ -454,16 +511,16 @@ test("one room follows both participants to matching videos in separate tabs", a
     const roomCode = (await host.popup.locator("#room-code-display").textContent())!.trim();
     await guest.popup.locator("#room-code").fill(roomCode);
     await guest.popup.locator("#join-form button[type='submit']").click();
-    await expect(host.popup.locator("#participant-count")).toHaveText("2 of 2");
-    await expect(guest.popup.locator("#participant-count")).toHaveText("2 of 2");
+    await expect(host.popup.locator("#participant-count")).toHaveText("2 of 8");
+    await expect(guest.popup.locator("#participant-count")).toHaveText("2 of 8");
 
     const hostNext = await openVideoTab(host, "spa.html");
     const guestNext = await openVideoTab(guest, "spa.html");
 
     await expect(host.popup.locator("#room-code-display")).toHaveText(roomCode);
     await expect(guest.popup.locator("#room-code-display")).toHaveText(roomCode);
-    await expect(host.popup.locator("#participant-count")).toHaveText("2 of 2");
-    await expect(guest.popup.locator("#participant-count")).toHaveText("2 of 2");
+    await expect(host.popup.locator("#participant-count")).toHaveText("2 of 8");
+    await expect(guest.popup.locator("#participant-count")).toHaveText("2 of 8");
 
     await hostNext.locator("#main-video").evaluate((element) => {
       const video = element as HTMLVideoElement;
@@ -499,8 +556,8 @@ test("one room follows both participants to matching videos in separate tabs", a
     await Promise.all([host.fixture.close(), guest.fixture.close()]);
     await expect(host.popup.locator("#room-code-display")).toHaveText(roomCode);
     await expect(guest.popup.locator("#room-code-display")).toHaveText(roomCode);
-    await expect(host.popup.locator("#participant-count")).toHaveText("2 of 2");
-    await expect(guest.popup.locator("#participant-count")).toHaveText("2 of 2");
+    await expect(host.popup.locator("#participant-count")).toHaveText("2 of 8");
+    await expect(guest.popup.locator("#participant-count")).toHaveText("2 of 8");
 
     await hostNext.locator("#main-video").evaluate((element) => {
       (element as HTMLVideoElement).currentTime = 3.1;
@@ -566,14 +623,14 @@ test("the host can pass leadership and the former host follows the new host acro
     const roomCode = (await originalHost.popup.locator("#room-code-display").textContent())!.trim();
     await originalGuest.popup.locator("#room-code").fill(roomCode);
     await originalGuest.popup.locator("#join-form button[type='submit']").click();
-    await expect(originalHost.popup.locator("#participant-count")).toHaveText("2 of 2");
-    await expect(originalGuest.popup.locator("#participant-count")).toHaveText("2 of 2");
+    await expect(originalHost.popup.locator("#participant-count")).toHaveText("2 of 8");
+    await expect(originalGuest.popup.locator("#participant-count")).toHaveText("2 of 8");
 
     await expect(originalHost.popup.locator("#pass-host")).toBeVisible();
     await expect(originalGuest.popup.locator("#pass-host")).toBeHidden();
     await originalHost.popup.locator("#pass-host").click();
 
-    await expect(originalHost.popup.locator("#room-role")).toHaveText("You’re the guest");
+    await expect(originalHost.popup.locator("#room-role")).toHaveText("You’re a guest");
     await expect(originalGuest.popup.locator("#room-role")).toHaveText("You’re the host");
     await expect(originalHost.popup.locator("#pass-host")).toBeHidden();
     await expect(originalHost.popup.locator("#end-room")).toBeHidden();
@@ -597,7 +654,7 @@ test("the host can pass leadership and the former host follows the new host acro
       "The videos don’t match. Open the host’s video to continue.",
     );
     await expect(originalGuest.popup.locator("#status-message")).toHaveText(
-      "Your friend is on a different video. Waiting for them to open yours.",
+      "1 person is on a different video.",
     );
 
     const formerHostVideo = await openVideoTab(originalHost, "spa.html");

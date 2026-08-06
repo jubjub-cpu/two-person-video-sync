@@ -9,11 +9,12 @@ import {
 
 describe("protocol versioning", () => {
   it("negotiates only an explicitly supported version", () => {
-    expect(PROTOCOL_VERSION).toBe(1);
-    expect(negotiateProtocolVersion([0, 1, 2])).toBe(1);
-    expect(negotiateProtocolVersion([0, 2])).toBeNull();
-    expect(isSupportedProtocolVersion(1)).toBe(true);
-    expect(isSupportedProtocolVersion("1")).toBe(false);
+    expect(PROTOCOL_VERSION).toBe(2);
+    expect(negotiateProtocolVersion([0, 1, 2])).toBe(2);
+    expect(negotiateProtocolVersion([0, 1])).toBeNull();
+    expect(isSupportedProtocolVersion(2)).toBe(true);
+    expect(isSupportedProtocolVersion(1)).toBe(false);
+    expect(isSupportedProtocolVersion("2")).toBe(false);
   });
 
   it("safely inspects incompatible and malformed envelopes", () => {

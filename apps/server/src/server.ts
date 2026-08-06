@@ -1,4 +1,5 @@
 import websocket from "@fastify/websocket";
+import { PROTOCOL_VERSION } from "@vyzync/protocol";
 import Fastify from "fastify";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { Server as HttpServer } from "node:http";
@@ -112,7 +113,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Bui
     reply.header("cache-control", "no-store");
     return {
       status: "ok",
-      protocolVersion: 1,
+      protocolVersion: PROTOCOL_VERSION,
       rooms: await service.roomCount(),
       connections: service.connectionCount(),
       uptimeSec: Math.floor(process.uptime()),
@@ -173,6 +174,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Bui
           { event: "websocket-error", remoteAddress: request.ip },
           "WebSocket transport error",
         );
+        socket.terminate();
       });
     },
   );

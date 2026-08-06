@@ -77,7 +77,21 @@ const RoomViewSchema = z
   .object({
     roomCode: z.string().max(32).optional(),
     role: z.enum(["host", "guest"]).optional(),
-    participantCount: z.union([z.literal(0), z.literal(1), z.literal(2)]),
+    hostParticipantId: z.string().min(1).max(80).optional(),
+    participantCount: z.number().int().min(0).max(32),
+    participantCapacity: z.number().int().min(2).max(32),
+    participants: z
+      .array(
+        z
+          .object({
+            participantId: z.string().min(1).max(80),
+            role: z.enum(["host", "guest"]),
+            connected: z.boolean(),
+            isSelf: z.boolean(),
+          })
+          .strict(),
+      )
+      .max(32),
     controlMode: ControlModeSchema,
     status: SyncStatusSchema,
     peerStatus: SyncStatusSchema.optional(),
@@ -135,7 +149,14 @@ export const RuntimeRequestSchema = z.discriminatedUnion("type", [
       endRoom: z.boolean(),
     })
     .strict(),
-  z.object({ type: z.literal("popup/transfer-host"), requestId, tabId }).strict(),
+  z
+    .object({
+      type: z.literal("popup/transfer-host"),
+      requestId,
+      tabId,
+      targetParticipantId: z.string().min(1).max(80),
+    })
+    .strict(),
   z
     .object({
       type: z.literal("popup/set-control-mode"),
@@ -170,7 +191,13 @@ export const RuntimeRequestSchema = z.discriminatedUnion("type", [
     })
     .strict(),
   z.object({ type: z.literal("content/reconnect"), requestId }).strict(),
-  z.object({ type: z.literal("content/transfer-host"), requestId }).strict(),
+  z
+    .object({
+      type: z.literal("content/transfer-host"),
+      requestId,
+      targetParticipantId: z.string().min(1).max(80),
+    })
+    .strict(),
   z
     .object({
       type: z.literal("content/leave-room"),

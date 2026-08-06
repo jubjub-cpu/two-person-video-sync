@@ -46,6 +46,7 @@ describe("extension runtime message schemas", () => {
       RuntimeRequestSchema.parse({
         type: "content/transfer-host",
         requestId: "request-transfer",
+        targetParticipantId: "participant-guest-1",
       }),
     ).toMatchObject({ type: "content/transfer-host" });
     expect(

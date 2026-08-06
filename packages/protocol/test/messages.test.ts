@@ -30,6 +30,8 @@ const roomId = createRoomId(random(2));
 const roomCode = createRoomCode(random(3));
 const hostId = createParticipantId(random(4));
 const guestId = createParticipantId(random(5));
+const secondGuestId = createParticipantId(random(11));
+const thirdGuestId = createParticipantId(random(12));
 const sessionId = createSessionId(random(6));
 const reconnectToken = createReconnectToken(random(7));
 const commandId = createCommandId(random(8));
@@ -94,7 +96,7 @@ describe("client runtime message schemas", () => {
     },
     { ...authBase, type: "participant.leave", reason: "user" },
     { ...authBase, type: "room.end" },
-    { ...authBase, type: "room.transfer-host" },
+    { ...authBase, type: "room.transfer-host", targetParticipantId: guestId },
     { ...authBase, type: "control.set", controlMode: "shared" },
     { ...authBase, type: "video.update", video },
     {
@@ -195,7 +197,34 @@ const orderedBase = {
   serverSequence: 5,
 };
 const participants = [
-  { participantId: hostId, role: "host", ready: true, playbackStatus: "playing" },
+  {
+    participantId: hostId,
+    role: "host",
+    connected: true,
+    ready: true,
+    playbackStatus: "playing",
+  },
+  {
+    participantId: guestId,
+    role: "guest",
+    connected: true,
+    ready: true,
+    playbackStatus: "paused",
+  },
+  {
+    participantId: secondGuestId,
+    role: "guest",
+    connected: true,
+    ready: false,
+    playbackStatus: "waiting",
+  },
+  {
+    participantId: thirdGuestId,
+    role: "guest",
+    connected: false,
+    ready: false,
+    playbackStatus: "waiting",
+  },
 ] as const;
 const roomSession = {
   roomId,
@@ -206,6 +235,7 @@ const roomSession = {
   role: "host" as const,
   controlMode: "host-only" as const,
   hostParticipantId: hostId,
+  participantCapacity: 8,
   expiresAtMs: 100_000,
   participants,
   state: playbackState,
@@ -242,6 +272,7 @@ describe("server runtime message schemas", () => {
       participant: {
         participantId: guestId,
         role: "guest",
+        connected: true,
         ready: false,
         playbackStatus: "waiting",
       },
@@ -271,8 +302,27 @@ describe("server runtime message schemas", () => {
       previousHostParticipantId: hostId,
       hostParticipantId: guestId,
       participants: [
-        { participantId: guestId, role: "host", ready: false, playbackStatus: "waiting" },
-        { participantId: hostId, role: "guest", ready: true, playbackStatus: "playing" },
+        {
+          participantId: guestId,
+          role: "host",
+          connected: true,
+          ready: false,
+          playbackStatus: "waiting",
+        },
+        {
+          participantId: hostId,
+          role: "guest",
+          connected: true,
+          ready: true,
+          playbackStatus: "playing",
+        },
+        {
+          participantId: secondGuestId,
+          role: "guest",
+          connected: true,
+          ready: false,
+          playbackStatus: "waiting",
+        },
       ],
     },
     { ...orderedBase, type: "video.updated", participantId: hostId, video },
@@ -335,10 +385,12 @@ describe("server runtime message schemas", () => {
     },
   );
 
-  it("rejects room payloads with more than two people and unsafe errors", () => {
+  it("accepts group rooms and rejects payloads above the supported capacity", () => {
+    expect(participants).toHaveLength(4);
+    expect(ServerMessageSchema.safeParse(validMessages[0]).success).toBe(true);
     const tooMany = {
       ...(validMessages[0] as Record<string, unknown>),
-      participants: [participants[0], participants[0], participants[0]],
+      participants: Array.from({ length: 33 }, () => participants[0]),
     };
     expect(ServerMessageSchema.safeParse(tooMany).success).toBe(false);
     expect(
