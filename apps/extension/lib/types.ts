@@ -66,10 +66,20 @@ export interface VideoCandidateSummary {
   selected: boolean;
 }
 
+export interface RoomParticipantView {
+  participantId: string;
+  role: "host" | "guest";
+  connected: boolean;
+  isSelf: boolean;
+}
+
 export interface RoomView {
   roomCode?: string;
   role?: "host" | "guest";
-  participantCount: 0 | 1 | 2;
+  hostParticipantId?: string;
+  participantCount: number;
+  participantCapacity: number;
+  participants: RoomParticipantView[];
   controlMode: ControlMode;
   status: SyncStatus;
   peerStatus?: SyncStatus;
@@ -113,7 +123,12 @@ export type RuntimeRequest =
   | { type: "popup/create-room"; requestId: string; tabId: number; controlMode: ControlMode }
   | { type: "popup/join-room"; requestId: string; tabId: number; roomCode: string }
   | { type: "popup/leave-room"; requestId: string; tabId: number; endRoom: boolean }
-  | { type: "popup/transfer-host"; requestId: string; tabId: number }
+  | {
+      type: "popup/transfer-host";
+      requestId: string;
+      tabId: number;
+      targetParticipantId: string;
+    }
   | { type: "popup/set-control-mode"; requestId: string; tabId: number; mode: ControlMode }
   | { type: "popup/select-video"; requestId: string; tabId: number; candidateId: string }
   | { type: "popup/user-ready"; requestId: string; tabId: number }
@@ -126,7 +141,7 @@ export type RuntimeRequest =
     }
   | { type: "content/action"; requestId: string; action: LocalMediaAction }
   | { type: "content/reconnect"; requestId: string }
-  | { type: "content/transfer-host"; requestId: string }
+  | { type: "content/transfer-host"; requestId: string; targetParticipantId: string }
   | { type: "content/leave-room"; requestId: string; endRoom: boolean }
   | {
       type: "content/mismatch";
@@ -171,6 +186,8 @@ export interface StoredSession {
   roomCode: string;
   roomId: string;
   role: "host" | "guest";
+  hostParticipantId?: string;
+  participantCapacity?: number;
   participantId: string;
   sessionId: string;
   reconnectToken: string;

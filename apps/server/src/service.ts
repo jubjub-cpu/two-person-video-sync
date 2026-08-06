@@ -109,6 +109,7 @@ function participantSummary(participant: ParticipantRecord): ParticipantSummary 
   return {
     participantId: participant.participantId,
     role: participant.role,
+    connected: participant.connectionId !== undefined,
     ready: participant.ready,
     playbackStatus: participant.playbackStatus,
   };
@@ -530,6 +531,7 @@ export class RoomService {
         lastActivityAtMs: now,
         serverSequence: 0,
         controlMode: message.controlMode,
+        participantCapacity: this.#config.maxParticipantsPerRoom,
         hostParticipantId: participantId,
         authoritativeParticipantId: participantId,
         state: undefined,
@@ -609,11 +611,11 @@ export class RoomService {
       this.#sendError(connection, "ROOM_EXPIRED", "Room has expired", false, message.requestId);
       return;
     }
-    if (room.participants.size >= 2) {
+    if (room.participants.size >= room.participantCapacity) {
       this.#sendError(
         connection,
         "ROOM_FULL",
-        "Room already has two participants",
+        "Room has reached its participant limit",
         false,
         message.requestId,
       );
@@ -924,15 +926,15 @@ export class RoomService {
           );
           return;
         }
-        const nextHost = [...room.participants.values()].find(
-          (candidate) => candidate.participantId !== participant.participantId,
-        );
+        const nextHost = room.participants.get(message.targetParticipantId);
         const nextHostConnection =
           nextHost?.connectionId === undefined
             ? undefined
             : this.#connections.get(nextHost.connectionId);
         if (
           nextHost === undefined ||
+          nextHost.participantId === participant.participantId ||
+          nextHost.role !== "guest" ||
           nextHostConnection === undefined ||
           nextHostConnection.closed ||
           nextHostConnection.socket.readyState !== SOCKET_OPEN
@@ -940,7 +942,7 @@ export class RoomService {
           this.#sendError(
             connection,
             "NOT_AUTHORIZED",
-            "The other participant must be connected before host control can be passed",
+            "The selected participant must be connected before host control can be passed",
             false,
             message.requestId,
           );
@@ -1014,7 +1016,7 @@ export class RoomService {
         await this.#acceptCommand(connection, room, participant, message, now);
         return;
       case "state.snapshot":
-        if (room.controlMode === "host-only" && participant.role !== "host") {
+        if (participant.role !== "host") {
           this.#sendError(
             connection,
             "NOT_AUTHORIZED",
@@ -1250,6 +1252,7 @@ export class RoomService {
       role: participant.role,
       controlMode: room.controlMode,
       hostParticipantId: room.hostParticipantId,
+      participantCapacity: room.participantCapacity,
       expiresAtMs: room.expiresAtMs,
       participants: participantSummaries(room),
       ...(room.state === undefined ? {} : { state: room.state }),

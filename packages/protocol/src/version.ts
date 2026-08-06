@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const PROTOCOL_VERSION = 1 as const;
+export const PROTOCOL_VERSION = 2 as const;
 export const SUPPORTED_PROTOCOL_VERSIONS = [PROTOCOL_VERSION] as const;
 export const ProtocolVersionSchema = z.literal(PROTOCOL_VERSION);
 export type ProtocolVersion = z.infer<typeof ProtocolVersionSchema>;

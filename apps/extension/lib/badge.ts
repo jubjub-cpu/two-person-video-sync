@@ -4,11 +4,11 @@ const labels: Record<SyncStatus, string> = {
   disabled: "Vyzync off",
   "no-video": "This player isn’t supported",
   ready: "Ready to sync",
-  waiting: "Waiting for the other person",
-  connected: "Connected to friend",
+  waiting: "Waiting for people",
+  connected: "Room connected",
   "in-sync": "In sync",
   correcting: "Correcting drift",
-  "peer-buffering": "Your friend is buffering",
+  "peer-buffering": "Someone is buffering",
   mismatch: "Different videos detected",
   "autoplay-blocked": "One click needed",
   reconnecting: "Reconnecting",
@@ -24,7 +24,7 @@ const compactLabels: Record<SyncStatus, string> = {
   connected: "Connected",
   "in-sync": "In sync",
   correcting: "Syncing",
-  "peer-buffering": "Friend buffering",
+  "peer-buffering": "Someone buffering",
   mismatch: "Video mismatch",
   "autoplay-blocked": "Click to continue",
   reconnecting: "Reconnecting",
@@ -48,7 +48,7 @@ export interface StatusBadgeActions {
   onCopyRoomCode?: (roomCode: string) => Promise<void> | void;
   onLeaveRoom?: (endRoom: boolean) => Promise<void> | void;
   onReconnect?: () => Promise<void> | void;
-  onTransferHost?: () => Promise<void> | void;
+  onTransferHost?: (targetParticipantId: string) => Promise<void> | void;
 }
 
 interface SyncQuality {
@@ -61,7 +61,7 @@ function formatRoomCode(roomCode: string): string {
 }
 
 function qualityForRoom(room?: RoomView): SyncQuality {
-  if (!room || room.participantCount !== 2) {
+  if (!room || room.participantCount <= 1) {
     return { label: "Unavailable", tone: "neutral" };
   }
   if (room.reconnecting || room.status === "reconnecting") {
@@ -128,6 +128,8 @@ export class StatusBadge {
   private readonly roomCodeDetail: HTMLElement;
   private readonly copyButton: HTMLButtonElement;
   private readonly reconnectButton: HTMLButtonElement;
+  private readonly transferGroup: HTMLDivElement;
+  private readonly transferTarget: HTMLSelectElement;
   private readonly transferButton: HTMLButtonElement;
   private readonly leaveButton: HTMLButtonElement;
   private readonly feedback: HTMLParagraphElement;
@@ -377,6 +379,36 @@ export class StatusBadge {
 
       .actions { border-top: 1px solid var(--border); padding: 5px 0; }
 
+      .transfer-group { border-block: 1px solid var(--border); margin-block: 5px; padding-block: 5px; }
+      .transfer-group[hidden] { display: none; }
+
+      .transfer-target-row {
+        align-items: center;
+        display: grid;
+        gap: 10px;
+        grid-template-columns: minmax(0, 1fr) 148px;
+        padding: 7px 14px 3px;
+      }
+
+      .transfer-target-row label {
+        color: var(--content-secondary);
+        font-size: 11px;
+        line-height: 1.3;
+      }
+
+      .transfer-target {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 2px;
+        color: var(--content-primary);
+        font: inherit;
+        font-size: 11px;
+        min-width: 0;
+        padding: 7px 8px;
+      }
+
+      .transfer-target:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
       .menu-action {
         align-items: center;
         background: transparent;
@@ -507,14 +539,14 @@ export class StatusBadge {
     const metrics = document.createElement("div");
     metrics.className = "metrics";
     const friendMetric = document.createElement("div");
-    friendMetric.className = "metric friend-metric";
+    friendMetric.className = "metric people-metric";
     this.friendIcon = icon(this.icons.userDisconnected);
     const friendLabel = document.createElement("span");
     friendLabel.className = "metric-label";
-    friendLabel.textContent = "Friend";
+    friendLabel.textContent = "People";
     this.friendValue = document.createElement("strong");
     this.friendValue.className = "metric-value friend-value";
-    this.friendValue.textContent = "Disconnected";
+    this.friendValue.textContent = "Only you";
     friendMetric.append(this.friendIcon, friendLabel, this.friendValue);
 
     const qualityMetric = document.createElement("div");
@@ -541,9 +573,23 @@ export class StatusBadge {
     this.transferButton = actionButton(
       this.icons.transfer,
       "Pass host",
-      "Make your friend the host",
+      "Give room controls to this person",
       "transfer",
     );
+    this.transferGroup = document.createElement("div");
+    this.transferGroup.className = "transfer-group";
+    this.transferGroup.hidden = true;
+    const transferTargetRow = document.createElement("div");
+    transferTargetRow.className = "transfer-target-row";
+    const transferTargetLabel = document.createElement("label");
+    transferTargetLabel.textContent = "Pass host to";
+    this.transferTarget = document.createElement("select");
+    this.transferTarget.id = "vyzync-host-target";
+    this.transferTarget.className = "transfer-target";
+    transferTargetLabel.htmlFor = this.transferTarget.id;
+    this.transferTarget.setAttribute("aria-label", "Choose the next host");
+    transferTargetRow.append(transferTargetLabel, this.transferTarget);
+    this.transferGroup.append(transferTargetRow, this.transferButton);
     this.leaveButton = actionButton(
       this.icons.leave,
       "Leave room",
@@ -555,7 +601,7 @@ export class StatusBadge {
     this.reconnectButton.addEventListener("click", () => void this.reconnect());
     this.transferButton.addEventListener("click", () => void this.transferHost());
     this.leaveButton.addEventListener("click", () => void this.leaveRoom());
-    actionList.append(this.copyButton, this.transferButton, this.reconnectButton, this.leaveButton);
+    actionList.append(this.copyButton, this.transferGroup, this.reconnectButton, this.leaveButton);
 
     this.feedback = document.createElement("p");
     this.feedback.className = "feedback";
@@ -648,8 +694,9 @@ export class StatusBadge {
   }
 
   private refreshRoomDetails(): void {
-    const connected = this.room?.participantCount === 2;
-    this.friendValue.textContent = connected ? "Connected" : "Disconnected";
+    const connectedCount = this.room?.participantCount ?? 0;
+    const connected = connectedCount > 1;
+    this.friendValue.textContent = connected ? `${connectedCount} connected` : "Only you";
     this.friendValue.dataset.tone = connected ? "good" : "neutral";
     const friendIconUrl = connected ? this.icons.userConnected : this.icons.userDisconnected;
     this.friendIcon.style.webkitMaskImage = `url("${friendIconUrl}")`;
@@ -666,10 +713,27 @@ export class StatusBadge {
       !roomCode || !this.actions.onCopyRoomCode || Boolean(this.busyAction);
     this.reconnectButton.disabled =
       !activeRoom || !this.actions.onReconnect || Boolean(this.busyAction);
-    const canTransferHost = connected && this.room?.role === "host";
-    this.transferButton.hidden = !canTransferHost;
+    const previousTarget = this.transferTarget.value;
+    const transferTargets =
+      this.room?.participants.filter(
+        (participant) =>
+          participant.connected && !participant.isSelf && participant.role === "guest",
+      ) ?? [];
+    this.transferTarget.replaceChildren();
+    transferTargets.forEach((participant, index) => {
+      const option = document.createElement("option");
+      option.value = participant.participantId;
+      option.textContent = `Connected person ${index + 1}`;
+      this.transferTarget.append(option);
+    });
+    if (transferTargets.some((participant) => participant.participantId === previousTarget)) {
+      this.transferTarget.value = previousTarget;
+    }
+    const canTransferHost = this.room?.role === "host" && transferTargets.length > 0;
+    this.transferGroup.hidden = !canTransferHost;
     this.transferButton.disabled =
       !canTransferHost || !this.actions.onTransferHost || Boolean(this.busyAction);
+    this.transferTarget.disabled = !canTransferHost || Boolean(this.busyAction);
     this.leaveButton.disabled =
       !activeRoom || !this.actions.onLeaveRoom || Boolean(this.busyAction);
   }
@@ -687,7 +751,13 @@ export class StatusBadge {
 
   private async transferHost(): Promise<void> {
     if (!this.actions.onTransferHost) return;
-    await this.runAction("transfer", this.actions.onTransferHost, "Host passed.");
+    const targetParticipantId = this.transferTarget.value;
+    if (!targetParticipantId) return;
+    await this.runAction(
+      "transfer",
+      () => this.actions.onTransferHost!(targetParticipantId),
+      "Host passed.",
+    );
   }
 
   private async leaveRoom(): Promise<void> {

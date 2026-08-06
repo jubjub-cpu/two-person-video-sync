@@ -1,3 +1,5 @@
+import { DEFAULT_ROOM_PARTICIPANT_CAPACITY, MAX_ROOM_PARTICIPANT_CAPACITY } from "@vyzync/protocol";
+
 export type EnvironmentName = "development" | "test" | "production";
 
 export interface RateLimitConfig {
@@ -26,6 +28,7 @@ export interface ServerConfig {
   readonly maxPayloadBytes: number;
   readonly maxConnections: number;
   readonly maxConnectionsPerIp: number;
+  readonly maxParticipantsPerRoom: number;
   readonly rateLimits: RateLimitConfig;
   readonly roomTtlMs: number;
   readonly roomIdleTtlMs: number;
@@ -125,6 +128,13 @@ export function loadConfig(env: Environment = process.env): ServerConfig {
     maxPayloadBytes: parseInteger(env, "MAX_PAYLOAD_BYTES", 16 * 1024, 1024, 64 * 1024),
     maxConnections: parseInteger(env, "MAX_CONNECTIONS", 10_000, 2, 1_000_000),
     maxConnectionsPerIp: parseInteger(env, "MAX_CONNECTIONS_PER_IP", 20, 1, 10_000),
+    maxParticipantsPerRoom: parseInteger(
+      env,
+      "MAX_PARTICIPANTS_PER_ROOM",
+      DEFAULT_ROOM_PARTICIPANT_CAPACITY,
+      2,
+      MAX_ROOM_PARTICIPANT_CAPACITY,
+    ),
     rateLimits: {
       connectionAttempts: parseInteger(env, "CONNECTION_ATTEMPTS_PER_MINUTE", 60, 1, 100_000),
       connectionWindowMs: 60_000,

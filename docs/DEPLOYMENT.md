@@ -13,7 +13,7 @@ The public relay used by Vyzync is
 3. Wait for `/health` to report `status: ok`.
 4. Use the service address with `/ws`, for example `wss://YOUR-SERVICE.onrender.com/ws`.
 
-The included `render.yaml` configures one Docker instance, TLS proxy awareness, the health check, and extension-origin access. The server keeps rooms in memory, so restarting the service ends active rooms and more than one instance is not supported.
+The included `render.yaml` configures one Docker instance, TLS proxy awareness, the health check, extension-origin access, and an eight-participant room limit. Set `MAX_PARTICIPANTS_PER_ROOM` between 2 and 32 to choose a different capacity. The server keeps rooms in memory, so restarting the service ends active rooms and more than one instance is not supported.
 
 ## Build for a separate relay
 
@@ -41,13 +41,13 @@ Development and test builds use `ws://127.0.0.1:8787/ws` by default.
 ## Run with Docker
 
 ```powershell
-docker build --file apps/server/Dockerfile --tag vyzync-server:0.3.1 .
+docker build --file apps/server/Dockerfile --tag vyzync-server:0.4.0 .
 docker run --rm `
   --name vyzync-server `
   --publish 8787:8787 `
   --env HOST=0.0.0.0 `
   --env PORT=8787 `
-  vyzync-server:0.3.1
+  vyzync-server:0.4.0
 ```
 
 Public deployments must terminate TLS, set `TRUST_PROXY=true`, use `wss://`, keep one service instance, and keep room credentials out of URLs and logs.

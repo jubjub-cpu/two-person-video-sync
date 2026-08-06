@@ -43,6 +43,8 @@ function state(overrides: Partial<PopupState> = {}): PopupState {
     ],
     room: {
       participantCount: 0,
+      participantCapacity: 8,
+      participants: [],
       controlMode: "host-only",
       status: "ready",
       message: "Ready.",

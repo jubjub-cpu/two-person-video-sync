@@ -1,4 +1,10 @@
-import { PROTOCOL_VERSION, createCommandId, createPingId, createSessionId } from "@vyzync/protocol";
+import {
+  PROTOCOL_VERSION,
+  createCommandId,
+  createParticipantId,
+  createPingId,
+  createSessionId,
+} from "@vyzync/protocol";
 import type { ClientMessage, PlaybackCommand } from "@vyzync/protocol";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -42,6 +48,20 @@ async function expectUpgradeRejected(
   expect(response.statusCode).toBe(statusCode);
 }
 
+async function expectClientClosed(
+  client: TestClient,
+  expectedCode: number,
+  scenario: string,
+): Promise<void> {
+  try {
+    expect(await client.waitForClose()).toBe(expectedCode);
+  } catch (error) {
+    throw new Error(
+      `${scenario}: ${error instanceof Error ? error.message : "WebSocket did not close"}`,
+    );
+  }
+}
+
 afterEach(async () => {
   for (const current of harnesses.splice(0).reverse()) {
     await current.stop();
@@ -49,27 +69,45 @@ afterEach(async () => {
 });
 
 describe("Vyzync WebSocket service", () => {
-  it("reports health, creates a room, joins it, and rejects a third participant", async () => {
-    const server = await harness();
+  it("holds a host and three guests, broadcasts presence, and enforces room capacity", async () => {
+    const server = await harness({ maxParticipantsPerRoom: 4 });
     const host = await TestClient.connect(server.wsUrl);
-    const guest = await TestClient.connect(server.wsUrl);
-    const third = await TestClient.connect(server.wsUrl);
+    const firstGuest = await TestClient.connect(server.wsUrl);
+    const secondGuest = await TestClient.connect(server.wsUrl);
+    const thirdGuest = await TestClient.connect(server.wsUrl);
+    const overflow = await TestClient.connect(server.wsUrl);
 
     const created = await createRoom(host, server.clock);
     expect(created.role).toBe("host");
+    expect(created.participantCapacity).toBe(4);
     expect(created.participants).toHaveLength(1);
-    const joined = await joinRoom(guest, server.clock, created.roomCode);
-    expect(joined.role).toBe("guest");
-    expect(joined.participants).toHaveLength(2);
-    const hostNotice = await host.nextType("participant.joined");
-    expect(hostNotice.participant.participantId).toBe(joined.participantId);
+    const firstJoined = await joinRoom(firstGuest, server.clock, created.roomCode);
+    expect((await host.nextType("participant.joined")).participant.participantId).toBe(
+      firstJoined.participantId,
+    );
+    const secondJoined = await joinRoom(secondGuest, server.clock, created.roomCode);
+    expect((await host.nextType("participant.joined")).participant.participantId).toBe(
+      secondJoined.participantId,
+    );
+    expect((await firstGuest.nextType("participant.joined")).participant.participantId).toBe(
+      secondJoined.participantId,
+    );
+    const thirdJoined = await joinRoom(thirdGuest, server.clock, created.roomCode);
+    expect(thirdJoined.role).toBe("guest");
+    expect(thirdJoined.participants).toHaveLength(4);
+    expect(thirdJoined.participants.every((participant) => participant.connected)).toBe(true);
+    for (const existing of [host, firstGuest, secondGuest]) {
+      expect((await existing.nextType("participant.joined")).participant.participantId).toBe(
+        thirdJoined.participantId,
+      );
+    }
 
-    third.send({
+    overflow.send({
       ...envelope(server.clock),
       type: "room.join",
       roomCode: created.roomCode,
     });
-    const full = await third.nextType("error");
+    const full = await overflow.nextType("error");
     expect(full.code).toBe("ROOM_FULL");
 
     const health = await server.built.app.inject({ method: "GET", url: "/health" });
@@ -79,7 +117,7 @@ describe("Vyzync WebSocket service", () => {
       status: "ok",
       protocolVersion: PROTOCOL_VERSION,
       rooms: 1,
-      connections: 3,
+      connections: 5,
     });
   });
 
@@ -191,47 +229,55 @@ describe("Vyzync WebSocket service", () => {
     expect((await guest.nextType("error")).code).toBe("NOT_AUTHORIZED");
   });
 
-  it("transfers host authority to the connected guest and enforces the new roles", async () => {
+  it("transfers host authority to a selected guest and preserves every other role", async () => {
     const server = await harness();
     const host = await TestClient.connect(server.wsUrl);
-    const guest = await TestClient.connect(server.wsUrl);
+    const firstGuest = await TestClient.connect(server.wsUrl);
+    const secondGuest = await TestClient.connect(server.wsUrl);
     const created = await createRoom(host, server.clock);
 
     host.send({
       ...envelope(server.clock),
       ...auth(created),
       type: "room.transfer-host",
+      targetParticipantId: createParticipantId(),
     });
     expect((await host.nextType("error")).message).toContain("must be connected");
 
-    const joined = await joinRoom(guest, server.clock, created.roomCode);
-    guest.send({
+    const firstJoined = await joinRoom(firstGuest, server.clock, created.roomCode);
+    const secondJoined = await joinRoom(secondGuest, server.clock, created.roomCode);
+    firstGuest.send({
       ...envelope(server.clock),
-      ...auth(joined),
+      ...auth(firstJoined),
       type: "room.transfer-host",
+      targetParticipantId: secondJoined.participantId,
     });
-    expect((await guest.nextType("error")).code).toBe("NOT_AUTHORIZED");
+    expect((await firstGuest.nextType("error")).code).toBe("NOT_AUTHORIZED");
 
     host.send({
       ...envelope(server.clock),
       ...auth(created),
       type: "room.transfer-host",
+      targetParticipantId: secondJoined.participantId,
     });
     const hostTransfer = await host.nextType("room.host-transferred");
-    const guestTransfer = await guest.nextType("room.host-transferred");
-    expect(guestTransfer).toEqual(hostTransfer);
+    const firstGuestTransfer = await firstGuest.nextType("room.host-transferred");
+    const secondGuestTransfer = await secondGuest.nextType("room.host-transferred");
+    expect(firstGuestTransfer).toEqual(hostTransfer);
+    expect(secondGuestTransfer).toEqual(hostTransfer);
     expect(hostTransfer).toMatchObject({
       previousHostParticipantId: created.participantId,
-      hostParticipantId: joined.participantId,
+      hostParticipantId: secondJoined.participantId,
       participants: [
-        { participantId: joined.participantId, role: "host" },
+        { participantId: secondJoined.participantId, role: "host", connected: true },
         { participantId: created.participantId, role: "guest" },
+        { participantId: firstJoined.participantId, role: "guest" },
       ],
     });
 
     const storedRoom = await server.built.service.store.getById(created.roomId);
-    expect(storedRoom?.hostParticipantId).toBe(joined.participantId);
-    expect(storedRoom?.authoritativeParticipantId).toBe(joined.participantId);
+    expect(storedRoom?.hostParticipantId).toBe(secondJoined.participantId);
+    expect(storedRoom?.authoritativeParticipantId).toBe(secondJoined.participantId);
     expect(storedRoom?.state).toBeUndefined();
 
     host.send({
@@ -244,17 +290,20 @@ describe("Vyzync WebSocket service", () => {
     });
     expect((await host.nextType("error")).code).toBe("NOT_AUTHORIZED");
 
-    guest.send({
+    secondGuest.send({
       ...envelope(server.clock),
-      ...auth(joined),
+      ...auth(secondJoined),
       type: "command.submit",
       commandId: createCommandId(),
       clientSequence: 0,
       action: { type: "play", positionSec: 15, playbackRate: 1 },
     });
-    const accepted = await guest.nextType("command.accepted");
-    expect(accepted.originParticipantId).toBe(joined.participantId);
+    const accepted = await secondGuest.nextType("command.accepted");
+    expect(accepted.originParticipantId).toBe(secondJoined.participantId);
     expect((await host.nextType("command.accepted")).serverSequence).toBe(accepted.serverSequence);
+    expect((await firstGuest.nextType("command.accepted")).serverSequence).toBe(
+      accepted.serverSequence,
+    );
 
     host.send({
       ...envelope(server.clock),
@@ -263,13 +312,16 @@ describe("Vyzync WebSocket service", () => {
     });
     expect((await host.nextType("error")).code).toBe("NOT_AUTHORIZED");
 
-    guest.send({
+    secondGuest.send({
       ...envelope(server.clock),
-      ...auth(joined),
+      ...auth(secondJoined),
       type: "room.end",
     });
-    expect((await guest.nextType("room.ended")).endedByParticipantId).toBe(joined.participantId);
+    expect((await secondGuest.nextType("room.ended")).endedByParticipantId).toBe(
+      secondJoined.participantId,
+    );
     expect((await host.nextType("room.ended")).reason).toBe("host-ended");
+    expect((await firstGuest.nextType("room.ended")).reason).toBe("host-ended");
   });
 
   it("broadcasts readiness, video, playback status, snapshots, and NTP-style pong timestamps", async () => {
@@ -367,12 +419,12 @@ describe("Vyzync WebSocket service", () => {
       malformed.sendRaw("{");
       expect((await malformed.nextType("error")).code).toBe("INVALID_MESSAGE");
     }
-    expect(await malformed.waitForClose()).toBe(1008);
+    await expectClientClosed(malformed, 1008, "repeated malformed message close");
 
     const binary = await TestClient.connect(server.wsUrl);
     binary.sendRaw(Buffer.from("{}"));
     expect((await binary.nextType("error")).code).toBe("INVALID_MESSAGE");
-    expect(await binary.waitForClose()).toBe(1003);
+    await expectClientClosed(binary, 1003, "binary message close");
 
     const incompatible = await TestClient.connect(server.wsUrl);
     incompatible.sendRaw(
@@ -389,11 +441,11 @@ describe("Vyzync WebSocket service", () => {
       supportedVersions: [PROTOCOL_VERSION],
       code: "PROTOCOL_VERSION_UNSUPPORTED",
     });
-    expect(await incompatible.waitForClose()).toBe(1002);
+    await expectClientClosed(incompatible, 1002, "incompatible protocol close");
 
     const oversized = await TestClient.connect(server.wsUrl);
     oversized.sendRaw("x".repeat(16 * 1024 + 1));
-    expect(await oversized.waitForClose()).toBe(1009);
+    await expectClientClosed(oversized, 1009, "oversized message close");
   });
 
   it("restores a disconnected participant, rotates credentials, and rejects an old token", async () => {
@@ -456,7 +508,7 @@ describe("Vyzync WebSocket service", () => {
   });
 
   it("removes an explicitly leaving guest and permits a replacement guest", async () => {
-    const server = await harness();
+    const server = await harness({ maxParticipantsPerRoom: 2 });
     const host = await TestClient.connect(server.wsUrl);
     const guest = await TestClient.connect(server.wsUrl);
     const created = await createRoom(host, server.clock);
@@ -477,7 +529,7 @@ describe("Vyzync WebSocket service", () => {
   });
 
   it("reserves a disconnected slot only for the configured reconnect grace period", async () => {
-    const server = await harness({ reconnectGraceMs: 1_000 });
+    const server = await harness({ reconnectGraceMs: 1_000, maxParticipantsPerRoom: 2 });
     const host = await TestClient.connect(server.wsUrl);
     const guest = await TestClient.connect(server.wsUrl);
     const created = await createRoom(host, server.clock);

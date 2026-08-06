@@ -86,7 +86,7 @@
                 <span class="ui-icon icon-users"></span>
               </span>
               <span class="mode-copy">
-                <strong>Either person</strong>
+                <strong>Anyone</strong>
                 <small>Anyone can control</small>
               </span>
               <input type="radio" name="control-mode" value="shared" />
@@ -96,7 +96,7 @@
 
         <div class="create-section">
           <span class="eyebrow">Create a room</span>
-          <p class="section-help">Create a private room and invite a friend.</p>
+          <p class="section-help">Create a private room and invite people.</p>
           <button id="create-room" class="primary full create-button" type="button">
             <span class="button-icon-frame" aria-hidden="true">
               <span class="ui-icon icon-plus"></span>
@@ -134,7 +134,7 @@
             <span class="eyebrow">Private room</span>
             <strong id="room-role">Host</strong>
           </div>
-          <span id="participant-count" class="participant-pill">1 of 2</span>
+          <span id="participant-count" class="participant-pill">1 of 8</span>
         </div>
         <div id="room-code-wrap">
           <label for="room-code-display">Share this code</label>
@@ -152,13 +152,19 @@
         <label class="switch-row" id="room-mode-row">
           <span>
             <strong>Shared controls</strong>
-            <small>Either person may play, pause, or seek</small>
+            <small>Anyone may play, pause, or seek</small>
           </span>
           <input id="room-mode" type="checkbox" role="switch" />
         </label>
-        <button id="pass-host" class="secondary full transfer-button" type="button" hidden>
-          Pass host to friend
-        </button>
+        <div id="host-transfer" class="host-transfer" hidden>
+          <label for="host-target">Pass host to</label>
+          <div class="transfer-row">
+            <select id="host-target" aria-label="Choose the next host"></select>
+            <button id="pass-host" class="secondary transfer-button" type="button">
+              Pass host
+            </button>
+          </div>
+        </div>
         <div class="button-row">
           <button id="leave-room" class="secondary" type="button">Leave room</button>
           <button id="end-room" class="danger" type="button" hidden>End room</button>

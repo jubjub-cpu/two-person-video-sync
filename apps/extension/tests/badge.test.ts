@@ -18,7 +18,14 @@ const icons: StatusBadgeIconUrls = {
 const connectedRoom: RoomView = {
   roomCode: "23456789ABCDEFGH",
   role: "host",
-  participantCount: 2,
+  hostParticipantId: "participant-host",
+  participantCount: 3,
+  participantCapacity: 8,
+  participants: [
+    { participantId: "participant-host", role: "host", connected: true, isSelf: true },
+    { participantId: "participant-guest-1", role: "guest", connected: true, isSelf: false },
+    { participantId: "participant-guest-2", role: "guest", connected: true, isSelf: false },
+  ],
   controlMode: "host-only",
   status: "in-sync",
   message: "Playback is synchronized.",
@@ -61,7 +68,7 @@ describe("in-page status badge", () => {
     expect(shadow?.querySelector(".expanded-detail")?.textContent).toBe(
       "Playback is synchronized.",
     );
-    expect(shadow?.querySelector(".friend-value")?.textContent).toBe("Connected");
+    expect(shadow?.querySelector(".friend-value")?.textContent).toBe("3 connected");
     expect(shadow?.querySelector(".quality-value")?.textContent).toBe("Good · 84 ms");
     expect(shadow?.querySelector("[data-action='copy'] .action-detail")?.textContent).toBe(
       "2345 6789 ABCD EFGH",
@@ -82,7 +89,7 @@ describe("in-page status badge", () => {
       onTransferHost,
       onLeaveRoom,
     });
-    badge.update("connected", "Connected to friend.", connectedRoom);
+    badge.update("connected", "Room connected.", connectedRoom);
 
     const shadow = document.querySelector<HTMLElement>("[data-vyzync='badge']")?.shadowRoot;
     shadow?.querySelector<HTMLButtonElement>(".badge-toggle")?.click();
@@ -94,7 +101,7 @@ describe("in-page status badge", () => {
 
     shadow?.querySelector<HTMLButtonElement>("[data-action='transfer']")?.click();
     await settleAction();
-    expect(onTransferHost).toHaveBeenCalledOnce();
+    expect(onTransferHost).toHaveBeenCalledWith("participant-guest-1");
     expect(shadow?.querySelector(".feedback")?.textContent).toBe("Host passed.");
 
     shadow?.querySelector<HTMLButtonElement>("[data-action='reconnect']")?.click();
@@ -108,19 +115,26 @@ describe("in-page status badge", () => {
 
   it("shows host transfer only to a connected host", () => {
     const badge = new StatusBadge("light", icons, { onTransferHost: vi.fn() });
+    const transferGroup = document
+      .querySelector<HTMLElement>("[data-vyzync='badge']")
+      ?.shadowRoot?.querySelector<HTMLElement>(".transfer-group");
     const transfer = document
       .querySelector<HTMLElement>("[data-vyzync='badge']")
       ?.shadowRoot?.querySelector<HTMLButtonElement>("[data-action='transfer']");
 
-    badge.update("waiting", "Waiting.", { ...connectedRoom, participantCount: 1 });
-    expect(transfer?.hidden).toBe(true);
+    badge.update("waiting", "Waiting.", {
+      ...connectedRoom,
+      participantCount: 1,
+      participants: [connectedRoom.participants[0]!],
+    });
+    expect(transferGroup?.hidden).toBe(true);
 
     badge.update("connected", "Connected.", connectedRoom);
-    expect(transfer?.hidden).toBe(false);
+    expect(transferGroup?.hidden).toBe(false);
     expect(transfer?.disabled).toBe(false);
 
     badge.update("connected", "Connected.", { ...connectedRoom, role: "guest" });
-    expect(transfer?.hidden).toBe(true);
+    expect(transferGroup?.hidden).toBe(true);
   });
 
   it("can be dismissed without removing the controller", () => {
