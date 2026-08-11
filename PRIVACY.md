@@ -1,8 +1,8 @@
 # Privacy Notice
 
-Last updated: August 3, 2026
+Last updated: August 10, 2026
 
-Vyzync coordinates playback state between exactly two people. It does not
+Vyzync coordinates playback state for groups of up to eight people. It does not
 capture, download, decrypt, proxy, rebroadcast, or share audio or video. Each participant
 loads the video independently through their own legitimate website account, subscription,
 device, region, and network connection.
@@ -10,7 +10,7 @@ device, region, and network connection.
 ## Data transmitted to the synchronization service
 
 While a room is active, the extension sends only the minimum metadata needed to compare and
-coordinate the two players:
+coordinate the connected players:
 
 - protocol, room, participant, session, command, and sequence identifiers;
 - the page origin and a normalized or fingerprinted content identity;
@@ -68,7 +68,7 @@ Required browser permissions are limited to:
 - `activeTab` for the user-initiated current-tab flow.
 
 Website access is optional. The extension asks for the exact current HTTP(S) origin when the
-user selects “Enable on this site.” The options page also offers an explicit all-websites
+user selects "Enable on this site." The options page also offers an explicit all-websites
 grant. Access can be revoked through the browser at any time; revocation unregisters future
 injection and tells an already-running controller to clean up.
 
