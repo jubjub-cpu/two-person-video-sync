@@ -1,11 +1,13 @@
 {
   "name": "@vyzync/e2e",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "type": "module",
   "scripts": {
     "prepare:extension": "pnpm --filter @vyzync/protocol build && pnpm --filter @vyzync/sync-core build && pnpm --filter @vyzync/extension build:chrome:test && node prepare-extension.mjs",
+    "prepare:extension:opera": "pnpm --filter @vyzync/protocol build && pnpm --filter @vyzync/sync-core build && pnpm --filter @vyzync/extension build:opera:test && node prepare-extension.mjs opera",
     "test": "pnpm prepare:extension && pnpm --filter @vyzync/server build && playwright test",
+    "test:opera": "pnpm prepare:extension:opera && pnpm --filter @vyzync/server build && node run-opera-tests.mjs",
     "test:public-smoke": "pnpm --filter @vyzync/extension build:chrome && node public-smoke.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint ."
@@ -13,6 +15,9 @@
   "devDependencies": {
     "@playwright/test": "1.62.0",
     "@types/node": "^24.1.0",
+    "@types/pngjs": "6.0.5",
+    "jsqr": "1.4.0",
+    "pngjs": "7.0.0",
     "typescript": "^5.8.3"
   }
 }

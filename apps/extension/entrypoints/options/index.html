@@ -153,33 +153,97 @@
 
         <div class="save-row">
           <button class="primary" type="submit">Save settings</button>
-          <div id="support-control" class="support-control">
-            <button
-              id="support-developer"
-              class="support-button"
-              type="button"
-              aria-haspopup="menu"
-              aria-expanded="false"
-              aria-controls="support-options"
-              disabled
-            >
-              Buy the dev a coffee
-            </button>
-            <div id="support-options" class="support-options" role="menu" hidden>
-              <button id="donate-bitcoin" class="support-option" type="button" role="menuitem">
-                <span>Bitcoin</span>
-                <small>BTC</small>
-              </button>
-              <button id="donate-ethereum" class="support-option" type="button" role="menuitem">
-                <span>Ethereum</span>
-                <small>ETH</small>
-              </button>
-            </div>
-          </div>
+          <button
+            id="support-developer"
+            class="support-button"
+            type="button"
+            aria-haspopup="dialog"
+            aria-expanded="false"
+            aria-controls="support-dialog"
+            disabled
+          >
+            Buy the dev a coffee
+          </button>
           <span id="save-status" role="status" aria-live="polite"></span>
         </div>
       </form>
     </main>
+
+    <dialog
+      id="support-dialog"
+      class="support-dialog"
+      aria-labelledby="support-title"
+      aria-describedby="support-description"
+    >
+      <div class="support-dialog-panel">
+        <header class="support-dialog-header">
+          <div>
+            <p class="support-kicker">Support Vyzync</p>
+            <h2 id="support-title">Buy the dev a coffee</h2>
+            <p id="support-description">Choose a network, then scan or copy.</p>
+          </div>
+          <button id="close-support-dialog" class="support-close" type="button">
+            <span aria-hidden="true">&times;</span>
+            <span class="visually-hidden">Close</span>
+          </button>
+        </header>
+
+        <div class="support-dialog-body">
+          <div class="support-wallet-picker" role="group" aria-label="Choose a payment network">
+            <button
+              id="support-bitcoin"
+              class="support-wallet-option"
+              type="button"
+              data-support-asset="bitcoin"
+              aria-pressed="true"
+            >
+              <strong>Bitcoin</strong>
+              <small>BTC</small>
+            </button>
+            <button
+              id="support-ethereum"
+              class="support-wallet-option"
+              type="button"
+              data-support-asset="ethereum"
+              aria-pressed="false"
+            >
+              <strong>Ethereum</strong>
+              <small>ETH</small>
+            </button>
+          </div>
+
+          <div class="support-payment-panel">
+            <div id="support-qr-frame" class="support-qr-frame" role="img">
+              <img id="support-qr" width="216" height="216" alt="" />
+            </div>
+
+            <div class="support-payment-details">
+              <div class="support-asset-heading">
+                <div>
+                  <span id="support-asset-symbol" class="support-symbol">BTC</span>
+                  <h3 id="support-asset-name">Bitcoin</h3>
+                </div>
+                <span class="support-network">Mainnet</span>
+              </div>
+              <p id="support-scan-label">Scan with a Bitcoin wallet</p>
+
+              <div class="support-address-card">
+                <span class="support-address-label">Wallet address</span>
+                <code id="support-address">3Ej3XVxtvkZqgrzeFt7AXfe5xtj67QnW87</code>
+              </div>
+
+              <button id="copy-support-address" class="primary support-copy" type="button">
+                Copy address
+              </button>
+              <p id="support-network-notice" class="support-network-notice">
+                Bitcoin network only.
+              </p>
+              <p id="support-status" class="support-status" role="status" aria-live="polite"></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </dialog>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>

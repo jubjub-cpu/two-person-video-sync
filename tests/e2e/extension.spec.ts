@@ -1,6 +1,9 @@
+import { Buffer } from "node:buffer";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 
+import jsQR from "jsqr";
+import { PNG } from "pngjs";
 import {
   chromium,
   expect,
@@ -11,7 +14,11 @@ import {
 } from "@playwright/test";
 
 const repositoryRoot = resolve(import.meta.dirname, "../..");
-const extensionPath = resolve(repositoryRoot, "apps/extension/.output/chrome-mv3-e2e");
+const extensionBrowser = process.env.VYZYNC_E2E_BROWSER ?? "chrome";
+if (!new Set(["chrome", "opera"]).has(extensionBrowser)) {
+  throw new Error(`Unsupported E2E extension target: ${extensionBrowser}`);
+}
+const extensionPath = resolve(repositoryRoot, `apps/extension/.output/${extensionBrowser}-mv3-e2e`);
 const profilesRoot = resolve(import.meta.dirname, ".profiles");
 const browserExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_PATH;
 
@@ -27,6 +34,13 @@ interface ExtensionTabsApi {
   tabs: {
     query(queryInfo: { url: string }): Promise<Array<{ id?: number }>>;
   };
+}
+
+function decodeQrDataUrl(source: string | null): string | undefined {
+  if (!source?.startsWith("data:image/png;base64,")) return undefined;
+  const png = PNG.sync.read(Buffer.from(source.slice(source.indexOf(",") + 1), "base64"));
+  const pixels = new Uint8ClampedArray(png.data);
+  return jsQR(pixels, png.width, png.height)?.data;
 }
 
 async function fixtureTabId(worker: Worker, pathname: string): Promise<number> {
@@ -177,6 +191,90 @@ async function openVideoTab(profile: Profile, pathname: string): Promise<Page> {
     .toBeGreaterThanOrEqual(2);
   return page;
 }
+
+test("settings support dialog renders real wallet QR codes and copies exact addresses", async () => {
+  const profile = await launchProfile("support-dialog");
+  try {
+    const extensionId = new URL(profile.worker.url()).hostname;
+    const extensionOrigin = `chrome-extension://${extensionId}`;
+    const options = await profile.context.newPage();
+    await options.goto(`${extensionOrigin}/options.html`);
+    await options.locator("#theme-dark").check({ force: true });
+    await expect(options.locator("html")).toHaveAttribute("data-theme", "dark");
+
+    const supportButton = options.locator("#support-developer");
+    await expect(supportButton).toBeEnabled();
+    await supportButton.click();
+    await expect(options.locator("#support-dialog")).toBeVisible();
+    await expect(supportButton).toHaveAttribute("aria-expanded", "true");
+
+    const qr = options.locator("#support-qr");
+    await expect(qr).toHaveAttribute("alt", "Bitcoin payment QR code");
+    await expect.poll(() => qr.getAttribute("src")).toMatch(/^data:image\/png;base64,/);
+    await expect
+      .poll(() => qr.evaluate((image) => (image as HTMLImageElement).naturalWidth))
+      .toBe(216);
+    const bitcoinQr = await qr.getAttribute("src");
+    expect(decodeQrDataUrl(bitcoinQr)).toBe("bitcoin:3Ej3XVxtvkZqgrzeFt7AXfe5xtj67QnW87");
+    await expect(options.locator("#support-address")).toHaveText(
+      "3Ej3XVxtvkZqgrzeFt7AXfe5xtj67QnW87",
+    );
+    if (process.env.VYZYNC_SUPPORT_SCREENSHOT) {
+      await options.screenshot({
+        animations: "disabled",
+        fullPage: true,
+        path: process.env.VYZYNC_SUPPORT_SCREENSHOT,
+      });
+    }
+
+    await options.locator("#copy-support-address").click();
+    await expect(options.locator("#support-status")).toHaveText("Address copied.");
+    await expect
+      .poll(() => profile.fixture.evaluate(() => navigator.clipboard.readText()))
+      .toBe("3Ej3XVxtvkZqgrzeFt7AXfe5xtj67QnW87");
+
+    await options.locator("#support-ethereum").click();
+    await expect(options.locator("#support-ethereum")).toHaveAttribute("aria-pressed", "true");
+    await expect(options.locator("#support-bitcoin")).toHaveAttribute("aria-pressed", "false");
+    await expect(options.locator("#support-address")).toHaveText(
+      "0x9B1110fAf0469474a681dba98826a0aeEc7A48B2",
+    );
+    await expect(qr).toHaveAttribute("alt", "Ethereum payment QR code");
+    await expect.poll(() => qr.getAttribute("src")).not.toBe(bitcoinQr);
+    expect(decodeQrDataUrl(await qr.getAttribute("src"))).toBe(
+      "ethereum:0x9B1110fAf0469474a681dba98826a0aeEc7A48B2@1",
+    );
+
+    await expect
+      .poll(() =>
+        options
+          .locator(".support-dialog-panel")
+          .evaluate((element) => getComputedStyle(element).backgroundColor),
+      )
+      .toBe("rgb(17, 17, 17)");
+
+    await options.locator("#close-support-dialog").click();
+    await expect(options.locator("#support-dialog")).toBeHidden();
+    await expect(supportButton).toHaveAttribute("aria-expanded", "false");
+
+    await options.locator("#theme-light").check({ force: true });
+    await expect(options.locator("html")).toHaveAttribute("data-theme", "light");
+    await supportButton.click();
+    await expect
+      .poll(() =>
+        options
+          .locator(".support-dialog-panel")
+          .evaluate((element) => getComputedStyle(element).backgroundColor),
+      )
+      .toBe("rgb(255, 255, 255)");
+    await expect
+      .poll(() => qr.evaluate((image) => (image as HTMLImageElement).naturalWidth))
+      .toBe(216);
+    await options.locator("#close-support-dialog").click();
+  } finally {
+    await closeProfile(profile);
+  }
+});
 
 test("two isolated extension profiles create, join, synchronize, recover, and avoid echoes", async () => {
   const host = await launchProfile("host");

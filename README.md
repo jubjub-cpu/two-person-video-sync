@@ -1,31 +1,38 @@
 # Vyzync
 
-A Chrome and Firefox extension that keeps play, pause, seeking, and playback speed synchronized for groups of up to eight people watching the same HTML5 video.
+A Chrome, Firefox, and Opera extension that keeps play, pause, seeking, and playback speed synchronized for groups of up to eight people watching the same HTML5 video.
 
 Each participant streams the video from their own account. The extension does not share, download, or transmit video or audio.
 
 ## Install
 
-Official one-click installation links will be added here after the first Chrome Web Store and
-Firefox Add-ons reviews are approved. Source and reviewer packages remain available from the
-[latest release](https://github.com/jubjub-cpu/two-person-video-sync/releases/latest).
+Official one-click installation links will be added here after the Chrome Web Store, Firefox
+Add-ons, and Opera Add-ons reviews are approved. Source and reviewer packages remain available
+from the [latest release](https://github.com/jubjub-cpu/two-person-video-sync/releases/latest).
 
 ### Chrome
 
-1. Download `vyzyncextension-0.4.0-chrome.zip`.
+1. Download `vyzyncextension-0.4.1-chrome.zip`.
 2. Extract the ZIP.
 3. Open `chrome://extensions` and turn on **Developer mode**.
 4. Select **Load unpacked** and choose the extracted folder.
 
 ### Firefox
 
-1. Download `vyzyncextension-0.4.0-firefox.zip`.
+1. Download `vyzyncextension-0.4.1-firefox.zip`.
 2. Extract the ZIP.
 3. Open `about:debugging#/runtime/this-firefox`.
 4. Select **Load Temporary Add-on** and choose `manifest.json` from the extracted folder.
 
 Firefox removes temporary add-ons when the browser closes. Use the official store release for
 permanent installation and automatic updates.
+
+### Opera
+
+1. Download `vyzyncextension-0.4.1-opera.zip`.
+2. Extract the ZIP.
+3. Open `opera:extensions` and turn on **Developer mode**.
+4. Select **Load unpacked** and choose the extracted folder.
 
 ## Use
 
@@ -45,9 +52,12 @@ corepack enable
 corepack prepare pnpm@11.9.0 --activate
 pnpm install --frozen-lockfile
 pnpm build
+pnpm package
 ```
 
-The extension builds are created in `apps/extension/.output`. To operate a separate relay, see the [deployment instructions](docs/DEPLOYMENT.md).
+The Chrome, Firefox, and Opera builds and release ZIPs are created in
+`apps/extension/.output`. To operate a separate relay, see the
+[deployment instructions](docs/DEPLOYMENT.md).
 
 ## Privacy and security
 
