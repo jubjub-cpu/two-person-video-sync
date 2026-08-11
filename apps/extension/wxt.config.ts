@@ -1,20 +1,58 @@
+import { resolve } from "node:path";
 import { defineConfig } from "wxt";
 
 const OPTIONAL_HOSTS = ["http://*/*", "https://*/*"];
 
 interface GeneratedManifest {
+  content_scripts?: unknown[];
   host_permissions?: string[];
   optional_host_permissions?: string[];
 }
 
 export default defineConfig({
   manifestVersion: 3,
+  targetBrowsers: ["chrome", "firefox", "opera"],
+  zip: {
+    sourcesRoot: resolve(import.meta.dirname, "../.."),
+    dotSources: true,
+    includeSources: [
+      ".npmrc",
+      ".prettierrc.json",
+      "LICENSE",
+      "PRIVACY.md",
+      "README.md",
+      "SECURITY.md",
+      "package.json",
+      "pnpm-lock.yaml",
+      "pnpm-workspace.yaml",
+      "tsconfig.base.json",
+      "apps/extension/entrypoints/**",
+      "apps/extension/import-meta.d.ts",
+      "apps/extension/lib/**",
+      "apps/extension/package.json",
+      "apps/extension/public/**",
+      "apps/extension/tsconfig.json",
+      "apps/extension/vitest.config.ts",
+      "apps/extension/wxt.config.ts",
+      "packages/protocol/package.json",
+      "packages/protocol/src/**",
+      "packages/protocol/tsconfig.build.json",
+      "packages/protocol/tsconfig.json",
+      "packages/sync-core/package.json",
+      "packages/sync-core/src/**",
+      "packages/sync-core/tsconfig.build.json",
+      "packages/sync-core/tsconfig.json",
+      "scripts/package-browser.mjs",
+      "scripts/verify-opera-build.mjs",
+    ],
+    sourcesTemplate: "{{name}}-{{version}}-{{browser}}-sources.zip",
+  },
   manifest: ({ browser }) => ({
     name: "Vyzync",
     short_name: "Vyzync",
     description:
       "Watch video together with up to eight people. Keep play, pause, seeking, and speed in sync.",
-    version: "0.4.0",
+    version: "0.4.1",
     ...(browser === "chrome" ? { minimum_chrome_version: "116" } : {}),
     permissions: ["activeTab", "clipboardWrite", "scripting", "storage"],
     optional_host_permissions: OPTIONAL_HOSTS,
@@ -54,6 +92,9 @@ export default defineConfig({
       );
       if (manifest.host_permissions.length === 0) {
         delete manifest.host_permissions;
+      }
+      if (manifest.content_scripts?.length === 0) {
+        delete manifest.content_scripts;
       }
       manifest.optional_host_permissions = Array.from(
         new Set([...(manifest.optional_host_permissions ?? []), ...OPTIONAL_HOSTS]),

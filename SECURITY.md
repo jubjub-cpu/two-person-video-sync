@@ -2,7 +2,7 @@
 
 ## Supported release
 
-The current release line is `0.3.x`. Release builds use the hosted synchronization relay.
+The current release line is `0.4.x`. Release builds use the hosted synchronization relay.
 Public browser builds are distributed only through the official store links in `README.md`.
 GitHub ZIP files are source or reviewer packages, not signed browser-store installers.
 
@@ -57,11 +57,12 @@ Before exposing the service publicly:
 5. Run as a non-root container user with a read-only filesystem where the platform permits.
 6. Patch the Node 24 LTS base image and production dependencies regularly.
 7. Keep infrastructure access logs short-lived and never add query-string room credentials.
-8. Re-run formatting, lint, type checking, all tests, `pnpm audit --prod`, Firefox lint, and
-   the repository secret scan before every release.
+8. Re-run formatting, lint, type checking, all tests, `pnpm audit --prod`, Firefox lint, Opera
+   build verification, and the repository secret scan before every release.
 
 ## Dependency and source integrity
 
 Dependencies are locked by `pnpm-lock.yaml`. Release artifacts must be reproduced from a
 clean checkout and compared with the generated manifest, permission list, and documented
-hashes. Store submission should include the reproducible source archive required by Mozilla.
+hashes. Store submissions should include the reproducible source archives required by Mozilla
+and Opera.

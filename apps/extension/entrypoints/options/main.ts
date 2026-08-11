@@ -1,19 +1,18 @@
 import { browser } from "wxt/browser";
+import { toDataURL } from "qrcode";
 
 import { clearDiagnostics, exportDiagnostics } from "../../lib/diagnostics";
 import { getSettings, saveSettings } from "../../lib/settings";
+import {
+  isSupportAssetId,
+  SUPPORT_ASSETS,
+  SUPPORT_ASSET_IDS,
+  type SupportAssetId,
+} from "../../lib/support";
 import { applyThemeMode } from "../../lib/theme";
 import type { ThemeMode } from "../../lib/types";
 
 import "./style.css";
-
-const DONATION_URLS = [
-  [
-    "donate-bitcoin",
-    "bitcoin:3Ej3XVxtvkZqgrzeFt7AXfe5xtj67QnW87?label=Vyzync&message=Buy%20the%20dev%20a%20coffee",
-  ],
-  ["donate-ethereum", "ethereum:0x9B1110fAf0469474a681dba98826a0aeEc7A48B2@1"],
-] as const;
 
 const form = required<HTMLFormElement>("settings-form");
 const defaultMode = required<HTMLSelectElement>("default-mode");
@@ -23,9 +22,25 @@ const themeLight = required<HTMLInputElement>("theme-light");
 const themeDark = required<HTMLInputElement>("theme-dark");
 const saveStatus = required<HTMLElement>("save-status");
 const permissionSummary = required<HTMLElement>("permission-summary");
-const supportControl = required<HTMLElement>("support-control");
 const supportDeveloper = required<HTMLButtonElement>("support-developer");
-const supportOptions = required<HTMLElement>("support-options");
+const supportDialog = required<HTMLDialogElement>("support-dialog");
+const closeSupportDialog = required<HTMLButtonElement>("close-support-dialog");
+const supportQrFrame = required<HTMLElement>("support-qr-frame");
+const supportQr = required<HTMLImageElement>("support-qr");
+const supportAssetName = required<HTMLElement>("support-asset-name");
+const supportAssetSymbol = required<HTMLElement>("support-asset-symbol");
+const supportScanLabel = required<HTMLElement>("support-scan-label");
+const supportAddress = required<HTMLElement>("support-address");
+const supportNetworkNotice = required<HTMLElement>("support-network-notice");
+const copySupportAddress = required<HTMLButtonElement>("copy-support-address");
+const supportStatus = required<HTMLElement>("support-status");
+const supportWalletOptions = Array.from(
+  document.querySelectorAll<HTMLButtonElement>("[data-support-asset]"),
+);
+
+let selectedSupportAssetId: SupportAssetId = "bitcoin";
+let supportRenderId = 0;
+let supportStatusTimer: number | undefined;
 
 function required<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
@@ -72,33 +87,125 @@ form.addEventListener("submit", (event) => {
   })();
 });
 
-function setSupportMenu(open: boolean): void {
-  supportOptions.hidden = !open;
-  supportDeveloper.setAttribute("aria-expanded", String(open));
+function clearSupportStatus(): void {
+  window.clearTimeout(supportStatusTimer);
+  supportStatusTimer = undefined;
+  supportStatus.textContent = "";
+  copySupportAddress.textContent = "Copy address";
+}
+
+function showSupportStatus(message: string): void {
+  clearSupportStatus();
+  supportStatus.textContent = message;
+  supportStatusTimer = window.setTimeout(clearSupportStatus, 2_000);
+}
+
+async function renderSupportAsset(assetId: SupportAssetId): Promise<void> {
+  const renderId = ++supportRenderId;
+  const asset = SUPPORT_ASSETS[assetId];
+  selectedSupportAssetId = assetId;
+  clearSupportStatus();
+
+  for (const option of supportWalletOptions) {
+    option.setAttribute("aria-pressed", String(option.dataset.supportAsset === assetId));
+  }
+
+  supportAssetName.textContent = asset.name;
+  supportAssetSymbol.textContent = asset.symbol;
+  supportScanLabel.textContent = asset.scanLabel;
+  supportAddress.textContent = asset.address;
+  supportNetworkNotice.textContent = asset.networkNotice;
+  supportQrFrame.setAttribute("aria-label", `${asset.name} payment QR code`);
+  supportQr.alt = `${asset.name} payment QR code`;
+
+  try {
+    const source = await toDataURL(asset.paymentUri, {
+      color: { dark: "#000000", light: "#ffffff" },
+      errorCorrectionLevel: "M",
+      margin: 4,
+      width: 216,
+    });
+    if (renderId === supportRenderId) supportQr.src = source;
+  } catch {
+    if (renderId !== supportRenderId) return;
+    supportQr.removeAttribute("src");
+    showSupportStatus("QR code unavailable. Copy the address instead.");
+  }
+}
+
+async function copyText(text: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return;
+  } catch {
+    const fallback = document.createElement("textarea");
+    fallback.value = text;
+    fallback.setAttribute("readonly", "");
+    fallback.style.position = "fixed";
+    fallback.style.opacity = "0";
+    document.body.append(fallback);
+    fallback.select();
+    const copied = document.execCommand("copy");
+    fallback.remove();
+    if (!copied) throw new Error("Clipboard copy failed");
+  }
 }
 
 supportDeveloper.disabled = false;
 supportDeveloper.addEventListener("click", () => {
-  setSupportMenu(supportOptions.hidden);
+  if (supportDialog.open) return;
+  supportDeveloper.setAttribute("aria-expanded", "true");
+  supportDialog.showModal();
+  void renderSupportAsset(selectedSupportAssetId);
+  closeSupportDialog.focus();
 });
 
-for (const [buttonId, url] of DONATION_URLS) {
-  required<HTMLButtonElement>(buttonId).addEventListener("click", () => {
-    setSupportMenu(false);
-    void browser.tabs.create({ url });
+closeSupportDialog.addEventListener("click", () => supportDialog.close());
+
+supportDialog.addEventListener("click", (event) => {
+  if (event.target === supportDialog) supportDialog.close();
+});
+
+supportDialog.addEventListener("close", () => {
+  supportDeveloper.setAttribute("aria-expanded", "false");
+  clearSupportStatus();
+  supportDeveloper.focus();
+});
+
+for (const option of supportWalletOptions) {
+  option.addEventListener("click", () => {
+    const assetId = option.dataset.supportAsset;
+    if (assetId && isSupportAssetId(assetId)) void renderSupportAsset(assetId);
   });
 }
 
-document.addEventListener("click", (event) => {
-  if (event.target instanceof Node && !supportControl.contains(event.target)) {
-    setSupportMenu(false);
-  }
+copySupportAddress.addEventListener("click", () => {
+  void (async () => {
+    try {
+      await copyText(SUPPORT_ASSETS[selectedSupportAssetId].address);
+      showSupportStatus("Address copied.");
+      copySupportAddress.textContent = "Copied";
+    } catch {
+      showSupportStatus("Copy failed. Select the address and copy it.");
+    }
+  })();
 });
 
 document.addEventListener("keydown", (event) => {
-  if (event.key !== "Escape" || supportOptions.hidden) return;
-  setSupportMenu(false);
-  supportDeveloper.focus();
+  if (!supportDialog.open || !["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+  const activeElement = document.activeElement;
+  const currentIndex = supportWalletOptions.findIndex((option) => option === activeElement);
+  if (currentIndex < 0) return;
+  event.preventDefault();
+  const direction = event.key === "ArrowRight" ? 1 : -1;
+  const nextIndex =
+    (currentIndex + direction + SUPPORT_ASSET_IDS.length) % SUPPORT_ASSET_IDS.length;
+  const nextAssetId = SUPPORT_ASSET_IDS[nextIndex];
+  const nextOption = supportWalletOptions[nextIndex];
+  if (nextAssetId && nextOption) {
+    nextOption.focus();
+    void renderSupportAsset(nextAssetId);
+  }
 });
 
 for (const input of [themeSystem, themeLight, themeDark]) {

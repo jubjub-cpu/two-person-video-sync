@@ -4,9 +4,13 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const extensionRoot = resolve(here, "../../apps/extension");
-const source = join(extensionRoot, ".output/chrome-mv3-testing");
+const browser = process.argv[2] ?? "chrome";
+if (!new Set(["chrome", "opera"]).has(browser)) {
+  throw new Error(`Unsupported E2E extension target: ${browser}`);
+}
+const source = join(extensionRoot, `.output/${browser}-mv3-testing`);
 const outputRoot = join(extensionRoot, ".output") + sep;
-const target = join(extensionRoot, ".output/chrome-mv3-e2e");
+const target = join(extensionRoot, `.output/${browser}-mv3-e2e`);
 
 if (!target.startsWith(outputRoot) || target === outputRoot.slice(0, -1)) {
   throw new Error("Refusing to prepare an E2E extension outside the extension output directory");

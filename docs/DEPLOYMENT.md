@@ -41,13 +41,13 @@ Development and test builds use `ws://127.0.0.1:8787/ws` by default.
 ## Run with Docker
 
 ```powershell
-docker build --file apps/server/Dockerfile --tag vyzync-server:0.4.0 .
+docker build --file apps/server/Dockerfile --tag vyzync-server:0.4.1 .
 docker run --rm `
   --name vyzync-server `
   --publish 8787:8787 `
   --env HOST=0.0.0.0 `
   --env PORT=8787 `
-  vyzync-server:0.4.0
+  vyzync-server:0.4.1
 ```
 
 Public deployments must terminate TLS, set `TRUST_PROXY=true`, use `wss://`, keep one service instance, and keep room credentials out of URLs and logs.

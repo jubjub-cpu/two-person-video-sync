@@ -1,18 +1,22 @@
 {
   "name": "@vyzync/extension",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "wxt",
     "dev:firefox": "wxt -b firefox --mv3",
-    "build": "pnpm build:chrome && pnpm build:firefox",
+    "dev:opera": "wxt -b opera --mv3",
+    "build": "pnpm build:chrome && pnpm build:firefox && pnpm build:opera",
     "build:chrome": "wxt build -b chrome --mv3",
     "build:chrome:test": "wxt build -b chrome --mv3 --mode testing",
     "build:firefox": "wxt build -b firefox --mv3",
+    "build:opera": "wxt build -b opera --mv3 && node ../../scripts/verify-opera-build.mjs",
+    "build:opera:test": "wxt build -b opera --mv3 --mode testing",
     "package:chrome": "wxt zip -b chrome --mv3",
-    "package:firefox": "wxt zip -b firefox --mv3",
-    "package:all": "pnpm package:chrome && pnpm package:firefox",
+    "package:firefox": "node ../../scripts/package-browser.mjs firefox",
+    "package:opera": "node ../../scripts/package-browser.mjs opera && node ../../scripts/verify-opera-build.mjs --package",
+    "package:all": "pnpm package:chrome && pnpm package:firefox && pnpm package:opera",
     "typecheck": "wxt prepare && tsc --noEmit",
     "test": "vitest run",
     "lint": "eslint ."
@@ -20,11 +24,13 @@
   "dependencies": {
     "@vyzync/protocol": "workspace:*",
     "@vyzync/sync-core": "workspace:*",
+    "qrcode": "1.5.4",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tabler/icons": "3.45.0",
     "@types/chrome": "^0.1.4",
+    "@types/qrcode": "1.5.6",
     "happy-dom": "^20.0.10",
     "vite": "^7.0.6",
     "wxt": "^0.21.2"
